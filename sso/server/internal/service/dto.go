@@ -3,7 +3,7 @@ package service
 import (
 	"time"
 
-	"mh-sso-svc/internal/db_model"
+	"mh-sso-svc/internal/model"
 	"mh-sso-svc/internal/utils"
 )
 
@@ -108,7 +108,7 @@ type IntrospectResult struct {
 }
 
 // buildUserInfo 组装用户展示信息（字段与接口文档对齐）
-func buildUserInfo(user *db_model.SysUser) UserInfo {
+func buildUserInfo(user *model.SysUser) UserInfo {
 	passwordChanged := 0
 	if user.PasswordVersion > 1 {
 		passwordChanged = 1

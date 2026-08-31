@@ -14,10 +14,10 @@ database:
     - sys_user_platform
     - sys_platform
 
-  outPath: "./internal/db_model"
+  outPath: "./internal/model"
   outFile: ""
   withUnitTest: false
-  modelPkgName: "db_model"
+  modelPkgName: "model"
 
   onlyModel: false
   fieldNullable: true

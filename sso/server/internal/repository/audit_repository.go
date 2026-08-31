@@ -1,8 +1,8 @@
 package repository
 
 import (
-	"mh-sso-svc/internal/db_model"
-	"mh-sso-svc/internal/db_model/query"
+	"mh-sso-svc/internal/model"
+	"mh-sso-svc/internal/model/query"
 )
 
 // AuditRepository 业务审计日志表（sys_audit_log）数据访问
@@ -33,7 +33,7 @@ func (r *AuditRepository) Create(record *AuditRecord) error {
 	if !record.Success {
 		result = 0
 	}
-	return r.q.SysAuditLog.Create(&db_model.SysAuditLog{
+	return r.q.SysAuditLog.Create(&model.SysAuditLog{
 		UserID:       record.UserID,
 		Action:       record.Action,
 		TargetType:   strPtr("user"),

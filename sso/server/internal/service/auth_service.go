@@ -6,8 +6,8 @@ import (
 
 	"mh-sso-svc/internal/cache"
 	"mh-sso-svc/internal/consts"
-	"mh-sso-svc/internal/db_model"
-	"mh-sso-svc/internal/db_model/query"
+	"mh-sso-svc/internal/model"
+	"mh-sso-svc/internal/model/query"
 	"mh-sso-svc/internal/repository"
 	"mh-sso-svc/internal/utils"
 
@@ -97,7 +97,7 @@ func (s *AuthService) Register(req RegisterRequest) (*RegisterResult, error) {
 		return nil, utils.NewBizError(utils.CodeServerError, "服务器内部错误")
 	}
 
-	user := &db_model.SysUser{
+	user := &model.SysUser{
 		Account:         req.Username,
 		Password:        passwordHash,
 		Name:            req.Nickname,

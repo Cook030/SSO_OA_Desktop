@@ -3,8 +3,8 @@ package repository
 import (
 	"errors"
 
-	"mh-sso-svc/internal/db_model"
-	"mh-sso-svc/internal/db_model/query"
+	"mh-sso-svc/internal/model"
+	"mh-sso-svc/internal/model/query"
 
 	"github.com/go-sql-driver/mysql"
 	"gorm.io/gen"
@@ -28,17 +28,17 @@ func NewUserRepository(q *query.Query) *UserRepository {
 }
 
 // Create 新增用户
-func (r *UserRepository) Create(user *db_model.SysUser) error {
+func (r *UserRepository) Create(user *model.SysUser) error {
 	return r.q.SysUser.Create(user)
 }
 
 // FindByID 按主键查询用户
-func (r *UserRepository) FindByID(id uint64) (*db_model.SysUser, error) {
+func (r *UserRepository) FindByID(id uint64) (*model.SysUser, error) {
 	return r.q.SysUser.Where(r.q.SysUser.ID.Eq(id)).First()
 }
 
 // FindByAccount 按登录账号查询用户（account / email / phone 任一匹配）
-func (r *UserRepository) FindByAccount(account string) (*db_model.SysUser, error) {
+func (r *UserRepository) FindByAccount(account string) (*model.SysUser, error) {
 	return r.q.SysUser.Where(
 		r.q.SysUser.Or(
 			r.q.SysUser.Account.Eq(account),

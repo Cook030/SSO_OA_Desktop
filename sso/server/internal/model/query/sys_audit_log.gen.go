@@ -16,14 +16,14 @@ import (
 
 	"gorm.io/plugin/dbresolver"
 
-	"mh-sso-svc/internal/db_model"
+	"mh-sso-svc/internal/model"
 )
 
 func newSysAuditLog(db *gorm.DB, opts ...gen.DOOption) sysAuditLog {
 	_sysAuditLog := sysAuditLog{}
 
 	_sysAuditLog.sysAuditLogDo.UseDB(db, opts...)
-	_sysAuditLog.sysAuditLogDo.UseModel(&db_model.SysAuditLog{})
+	_sysAuditLog.sysAuditLogDo.UseModel(&model.SysAuditLog{})
 
 	tableName := _sysAuditLog.sysAuditLogDo.TableName()
 	_sysAuditLog.ALL = field.NewAsterisk(tableName)
@@ -220,55 +220,55 @@ func (sysAuditLog sysAuditLogDo) Unscoped() *sysAuditLogDo {
 	return sysAuditLog.withDO(sysAuditLog.DO.Unscoped())
 }
 
-func (sysAuditLog sysAuditLogDo) Create(values ...*db_model.SysAuditLog) error {
+func (sysAuditLog sysAuditLogDo) Create(values ...*model.SysAuditLog) error {
 	if len(values) == 0 {
 		return nil
 	}
 	return sysAuditLog.DO.Create(values)
 }
 
-func (sysAuditLog sysAuditLogDo) CreateInBatches(values []*db_model.SysAuditLog, batchSize int) error {
+func (sysAuditLog sysAuditLogDo) CreateInBatches(values []*model.SysAuditLog, batchSize int) error {
 	return sysAuditLog.DO.CreateInBatches(values, batchSize)
 }
 
-func (sysAuditLog sysAuditLogDo) Save(values ...*db_model.SysAuditLog) error {
+func (sysAuditLog sysAuditLogDo) Save(values ...*model.SysAuditLog) error {
 	if len(values) == 0 {
 		return nil
 	}
 	return sysAuditLog.DO.Save(values)
 }
 
-func (sysAuditLog sysAuditLogDo) First() (*db_model.SysAuditLog, error) {
+func (sysAuditLog sysAuditLogDo) First() (*model.SysAuditLog, error) {
 	if result, err := sysAuditLog.DO.First(); err != nil {
 		return nil, err
 	} else {
-		return result.(*db_model.SysAuditLog), nil
+		return result.(*model.SysAuditLog), nil
 	}
 }
 
-func (sysAuditLog sysAuditLogDo) Take() (*db_model.SysAuditLog, error) {
+func (sysAuditLog sysAuditLogDo) Take() (*model.SysAuditLog, error) {
 	if result, err := sysAuditLog.DO.Take(); err != nil {
 		return nil, err
 	} else {
-		return result.(*db_model.SysAuditLog), nil
+		return result.(*model.SysAuditLog), nil
 	}
 }
 
-func (sysAuditLog sysAuditLogDo) Last() (*db_model.SysAuditLog, error) {
+func (sysAuditLog sysAuditLogDo) Last() (*model.SysAuditLog, error) {
 	if result, err := sysAuditLog.DO.Last(); err != nil {
 		return nil, err
 	} else {
-		return result.(*db_model.SysAuditLog), nil
+		return result.(*model.SysAuditLog), nil
 	}
 }
 
-func (sysAuditLog sysAuditLogDo) Find() ([]*db_model.SysAuditLog, error) {
+func (sysAuditLog sysAuditLogDo) Find() ([]*model.SysAuditLog, error) {
 	result, err := sysAuditLog.DO.Find()
-	return result.([]*db_model.SysAuditLog), err
+	return result.([]*model.SysAuditLog), err
 }
 
-func (sysAuditLog sysAuditLogDo) FindInBatch(batchSize int, fc func(tx gen.Dao, batch int) error) (results []*db_model.SysAuditLog, err error) {
-	buf := make([]*db_model.SysAuditLog, 0, batchSize)
+func (sysAuditLog sysAuditLogDo) FindInBatch(batchSize int, fc func(tx gen.Dao, batch int) error) (results []*model.SysAuditLog, err error) {
+	buf := make([]*model.SysAuditLog, 0, batchSize)
 	err = sysAuditLog.DO.FindInBatches(&buf, batchSize, func(tx gen.Dao, batch int) error {
 		defer func() { results = append(results, buf...) }()
 		return fc(tx, batch)
@@ -276,7 +276,7 @@ func (sysAuditLog sysAuditLogDo) FindInBatch(batchSize int, fc func(tx gen.Dao, 
 	return results, err
 }
 
-func (sysAuditLog sysAuditLogDo) FindInBatches(result *[]*db_model.SysAuditLog, batchSize int, fc func(tx gen.Dao, batch int) error) error {
+func (sysAuditLog sysAuditLogDo) FindInBatches(result *[]*model.SysAuditLog, batchSize int, fc func(tx gen.Dao, batch int) error) error {
 	return sysAuditLog.DO.FindInBatches(result, batchSize, fc)
 }
 
@@ -302,23 +302,23 @@ func (sysAuditLog sysAuditLogDo) Preload(fields ...field.RelationField) *sysAudi
 	return &sysAuditLog
 }
 
-func (sysAuditLog sysAuditLogDo) FirstOrInit() (*db_model.SysAuditLog, error) {
+func (sysAuditLog sysAuditLogDo) FirstOrInit() (*model.SysAuditLog, error) {
 	if result, err := sysAuditLog.DO.FirstOrInit(); err != nil {
 		return nil, err
 	} else {
-		return result.(*db_model.SysAuditLog), nil
+		return result.(*model.SysAuditLog), nil
 	}
 }
 
-func (sysAuditLog sysAuditLogDo) FirstOrCreate() (*db_model.SysAuditLog, error) {
+func (sysAuditLog sysAuditLogDo) FirstOrCreate() (*model.SysAuditLog, error) {
 	if result, err := sysAuditLog.DO.FirstOrCreate(); err != nil {
 		return nil, err
 	} else {
-		return result.(*db_model.SysAuditLog), nil
+		return result.(*model.SysAuditLog), nil
 	}
 }
 
-func (sysAuditLog sysAuditLogDo) FindByPage(offset int, limit int) (result []*db_model.SysAuditLog, count int64, err error) {
+func (sysAuditLog sysAuditLogDo) FindByPage(offset int, limit int) (result []*model.SysAuditLog, count int64, err error) {
 	result, err = sysAuditLog.Offset(offset).Limit(limit).Find()
 	if err != nil {
 		return
@@ -347,7 +347,7 @@ func (sysAuditLog sysAuditLogDo) Scan(result interface{}) (err error) {
 	return sysAuditLog.DO.Scan(result)
 }
 
-func (sysAuditLog sysAuditLogDo) Delete(models ...*db_model.SysAuditLog) (result gen.ResultInfo, err error) {
+func (sysAuditLog sysAuditLogDo) Delete(models ...*model.SysAuditLog) (result gen.ResultInfo, err error) {
 	return sysAuditLog.DO.Delete(models)
 }
 

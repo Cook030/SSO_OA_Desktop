@@ -16,14 +16,14 @@ import (
 
 	"gorm.io/plugin/dbresolver"
 
-	"mh-sso-svc/internal/db_model"
+	"mh-sso-svc/internal/model"
 )
 
 func newSysRole(db *gorm.DB, opts ...gen.DOOption) sysRole {
 	_sysRole := sysRole{}
 
 	_sysRole.sysRoleDo.UseDB(db, opts...)
-	_sysRole.sysRoleDo.UseModel(&db_model.SysRole{})
+	_sysRole.sysRoleDo.UseModel(&model.SysRole{})
 
 	tableName := _sysRole.sysRoleDo.TableName()
 	_sysRole.ALL = field.NewAsterisk(tableName)
@@ -208,55 +208,55 @@ func (sysRole sysRoleDo) Unscoped() *sysRoleDo {
 	return sysRole.withDO(sysRole.DO.Unscoped())
 }
 
-func (sysRole sysRoleDo) Create(values ...*db_model.SysRole) error {
+func (sysRole sysRoleDo) Create(values ...*model.SysRole) error {
 	if len(values) == 0 {
 		return nil
 	}
 	return sysRole.DO.Create(values)
 }
 
-func (sysRole sysRoleDo) CreateInBatches(values []*db_model.SysRole, batchSize int) error {
+func (sysRole sysRoleDo) CreateInBatches(values []*model.SysRole, batchSize int) error {
 	return sysRole.DO.CreateInBatches(values, batchSize)
 }
 
-func (sysRole sysRoleDo) Save(values ...*db_model.SysRole) error {
+func (sysRole sysRoleDo) Save(values ...*model.SysRole) error {
 	if len(values) == 0 {
 		return nil
 	}
 	return sysRole.DO.Save(values)
 }
 
-func (sysRole sysRoleDo) First() (*db_model.SysRole, error) {
+func (sysRole sysRoleDo) First() (*model.SysRole, error) {
 	if result, err := sysRole.DO.First(); err != nil {
 		return nil, err
 	} else {
-		return result.(*db_model.SysRole), nil
+		return result.(*model.SysRole), nil
 	}
 }
 
-func (sysRole sysRoleDo) Take() (*db_model.SysRole, error) {
+func (sysRole sysRoleDo) Take() (*model.SysRole, error) {
 	if result, err := sysRole.DO.Take(); err != nil {
 		return nil, err
 	} else {
-		return result.(*db_model.SysRole), nil
+		return result.(*model.SysRole), nil
 	}
 }
 
-func (sysRole sysRoleDo) Last() (*db_model.SysRole, error) {
+func (sysRole sysRoleDo) Last() (*model.SysRole, error) {
 	if result, err := sysRole.DO.Last(); err != nil {
 		return nil, err
 	} else {
-		return result.(*db_model.SysRole), nil
+		return result.(*model.SysRole), nil
 	}
 }
 
-func (sysRole sysRoleDo) Find() ([]*db_model.SysRole, error) {
+func (sysRole sysRoleDo) Find() ([]*model.SysRole, error) {
 	result, err := sysRole.DO.Find()
-	return result.([]*db_model.SysRole), err
+	return result.([]*model.SysRole), err
 }
 
-func (sysRole sysRoleDo) FindInBatch(batchSize int, fc func(tx gen.Dao, batch int) error) (results []*db_model.SysRole, err error) {
-	buf := make([]*db_model.SysRole, 0, batchSize)
+func (sysRole sysRoleDo) FindInBatch(batchSize int, fc func(tx gen.Dao, batch int) error) (results []*model.SysRole, err error) {
+	buf := make([]*model.SysRole, 0, batchSize)
 	err = sysRole.DO.FindInBatches(&buf, batchSize, func(tx gen.Dao, batch int) error {
 		defer func() { results = append(results, buf...) }()
 		return fc(tx, batch)
@@ -264,7 +264,7 @@ func (sysRole sysRoleDo) FindInBatch(batchSize int, fc func(tx gen.Dao, batch in
 	return results, err
 }
 
-func (sysRole sysRoleDo) FindInBatches(result *[]*db_model.SysRole, batchSize int, fc func(tx gen.Dao, batch int) error) error {
+func (sysRole sysRoleDo) FindInBatches(result *[]*model.SysRole, batchSize int, fc func(tx gen.Dao, batch int) error) error {
 	return sysRole.DO.FindInBatches(result, batchSize, fc)
 }
 
@@ -290,23 +290,23 @@ func (sysRole sysRoleDo) Preload(fields ...field.RelationField) *sysRoleDo {
 	return &sysRole
 }
 
-func (sysRole sysRoleDo) FirstOrInit() (*db_model.SysRole, error) {
+func (sysRole sysRoleDo) FirstOrInit() (*model.SysRole, error) {
 	if result, err := sysRole.DO.FirstOrInit(); err != nil {
 		return nil, err
 	} else {
-		return result.(*db_model.SysRole), nil
+		return result.(*model.SysRole), nil
 	}
 }
 
-func (sysRole sysRoleDo) FirstOrCreate() (*db_model.SysRole, error) {
+func (sysRole sysRoleDo) FirstOrCreate() (*model.SysRole, error) {
 	if result, err := sysRole.DO.FirstOrCreate(); err != nil {
 		return nil, err
 	} else {
-		return result.(*db_model.SysRole), nil
+		return result.(*model.SysRole), nil
 	}
 }
 
-func (sysRole sysRoleDo) FindByPage(offset int, limit int) (result []*db_model.SysRole, count int64, err error) {
+func (sysRole sysRoleDo) FindByPage(offset int, limit int) (result []*model.SysRole, count int64, err error) {
 	result, err = sysRole.Offset(offset).Limit(limit).Find()
 	if err != nil {
 		return
@@ -335,7 +335,7 @@ func (sysRole sysRoleDo) Scan(result interface{}) (err error) {
 	return sysRole.DO.Scan(result)
 }
 
-func (sysRole sysRoleDo) Delete(models ...*db_model.SysRole) (result gen.ResultInfo, err error) {
+func (sysRole sysRoleDo) Delete(models ...*model.SysRole) (result gen.ResultInfo, err error) {
 	return sysRole.DO.Delete(models)
 }
 

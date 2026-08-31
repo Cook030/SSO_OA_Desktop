@@ -5,7 +5,7 @@ import (
 
 	"mh-sso-svc/internal/cache"
 	"mh-sso-svc/internal/consts"
-	"mh-sso-svc/internal/db_model"
+	"mh-sso-svc/internal/model"
 	"mh-sso-svc/internal/utils"
 
 	"go.uber.org/zap"
@@ -45,7 +45,7 @@ func (m *SessionManager) audit(userID *uint64, account, eventType string, succes
 
 // CreateLoginSession 创建一次性会话与 refresh token 记录，返回会话 ID 与 refresh token 明文。
 // 两步 Redis 写入任一失败即整体失败，保证登录不产生"有会话无令牌"的残缺状态。
-func (m *SessionManager) CreateLoginSession(user *db_model.SysUser, loginIP, userAgent string, sessionTTL, refreshTTL time.Duration, now time.Time) (sessionID, refreshToken string, err error) {
+func (m *SessionManager) CreateLoginSession(user *model.SysUser, loginIP, userAgent string, sessionTTL, refreshTTL time.Duration, now time.Time) (sessionID, refreshToken string, err error) {
 	sessionID = utils.GenerateOpaqueToken("session_")
 	refreshToken = utils.GenerateOpaqueToken("rt_")
 

@@ -55,7 +55,7 @@ download: ## 下载 Go 模块依赖
 
 # gorm/gen 代码生成
 .PHONY: gen
-gen: ## 根据 gen.yaml 重新生成 db_model 与 query 代码
+gen: ## 根据 gen.yaml 重新生成 model 与 query 代码
 	go run gorm.io/gen/tools/gentool@latest -c gen.yaml
 
 # Docker 构建与运行

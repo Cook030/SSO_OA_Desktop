@@ -16,14 +16,14 @@ import (
 
 	"gorm.io/plugin/dbresolver"
 
-	"mh-sso-svc/internal/db_model"
+	"mh-sso-svc/internal/model"
 )
 
 func newSysUserPlatform(db *gorm.DB, opts ...gen.DOOption) sysUserPlatform {
 	_sysUserPlatform := sysUserPlatform{}
 
 	_sysUserPlatform.sysUserPlatformDo.UseDB(db, opts...)
-	_sysUserPlatform.sysUserPlatformDo.UseModel(&db_model.SysUserPlatform{})
+	_sysUserPlatform.sysUserPlatformDo.UseModel(&model.SysUserPlatform{})
 
 	tableName := _sysUserPlatform.sysUserPlatformDo.TableName()
 	_sysUserPlatform.ALL = field.NewAsterisk(tableName)
@@ -192,55 +192,55 @@ func (sysUserPlatform sysUserPlatformDo) Unscoped() *sysUserPlatformDo {
 	return sysUserPlatform.withDO(sysUserPlatform.DO.Unscoped())
 }
 
-func (sysUserPlatform sysUserPlatformDo) Create(values ...*db_model.SysUserPlatform) error {
+func (sysUserPlatform sysUserPlatformDo) Create(values ...*model.SysUserPlatform) error {
 	if len(values) == 0 {
 		return nil
 	}
 	return sysUserPlatform.DO.Create(values)
 }
 
-func (sysUserPlatform sysUserPlatformDo) CreateInBatches(values []*db_model.SysUserPlatform, batchSize int) error {
+func (sysUserPlatform sysUserPlatformDo) CreateInBatches(values []*model.SysUserPlatform, batchSize int) error {
 	return sysUserPlatform.DO.CreateInBatches(values, batchSize)
 }
 
-func (sysUserPlatform sysUserPlatformDo) Save(values ...*db_model.SysUserPlatform) error {
+func (sysUserPlatform sysUserPlatformDo) Save(values ...*model.SysUserPlatform) error {
 	if len(values) == 0 {
 		return nil
 	}
 	return sysUserPlatform.DO.Save(values)
 }
 
-func (sysUserPlatform sysUserPlatformDo) First() (*db_model.SysUserPlatform, error) {
+func (sysUserPlatform sysUserPlatformDo) First() (*model.SysUserPlatform, error) {
 	if result, err := sysUserPlatform.DO.First(); err != nil {
 		return nil, err
 	} else {
-		return result.(*db_model.SysUserPlatform), nil
+		return result.(*model.SysUserPlatform), nil
 	}
 }
 
-func (sysUserPlatform sysUserPlatformDo) Take() (*db_model.SysUserPlatform, error) {
+func (sysUserPlatform sysUserPlatformDo) Take() (*model.SysUserPlatform, error) {
 	if result, err := sysUserPlatform.DO.Take(); err != nil {
 		return nil, err
 	} else {
-		return result.(*db_model.SysUserPlatform), nil
+		return result.(*model.SysUserPlatform), nil
 	}
 }
 
-func (sysUserPlatform sysUserPlatformDo) Last() (*db_model.SysUserPlatform, error) {
+func (sysUserPlatform sysUserPlatformDo) Last() (*model.SysUserPlatform, error) {
 	if result, err := sysUserPlatform.DO.Last(); err != nil {
 		return nil, err
 	} else {
-		return result.(*db_model.SysUserPlatform), nil
+		return result.(*model.SysUserPlatform), nil
 	}
 }
 
-func (sysUserPlatform sysUserPlatformDo) Find() ([]*db_model.SysUserPlatform, error) {
+func (sysUserPlatform sysUserPlatformDo) Find() ([]*model.SysUserPlatform, error) {
 	result, err := sysUserPlatform.DO.Find()
-	return result.([]*db_model.SysUserPlatform), err
+	return result.([]*model.SysUserPlatform), err
 }
 
-func (sysUserPlatform sysUserPlatformDo) FindInBatch(batchSize int, fc func(tx gen.Dao, batch int) error) (results []*db_model.SysUserPlatform, err error) {
-	buf := make([]*db_model.SysUserPlatform, 0, batchSize)
+func (sysUserPlatform sysUserPlatformDo) FindInBatch(batchSize int, fc func(tx gen.Dao, batch int) error) (results []*model.SysUserPlatform, err error) {
+	buf := make([]*model.SysUserPlatform, 0, batchSize)
 	err = sysUserPlatform.DO.FindInBatches(&buf, batchSize, func(tx gen.Dao, batch int) error {
 		defer func() { results = append(results, buf...) }()
 		return fc(tx, batch)
@@ -248,7 +248,7 @@ func (sysUserPlatform sysUserPlatformDo) FindInBatch(batchSize int, fc func(tx g
 	return results, err
 }
 
-func (sysUserPlatform sysUserPlatformDo) FindInBatches(result *[]*db_model.SysUserPlatform, batchSize int, fc func(tx gen.Dao, batch int) error) error {
+func (sysUserPlatform sysUserPlatformDo) FindInBatches(result *[]*model.SysUserPlatform, batchSize int, fc func(tx gen.Dao, batch int) error) error {
 	return sysUserPlatform.DO.FindInBatches(result, batchSize, fc)
 }
 
@@ -274,23 +274,23 @@ func (sysUserPlatform sysUserPlatformDo) Preload(fields ...field.RelationField) 
 	return &sysUserPlatform
 }
 
-func (sysUserPlatform sysUserPlatformDo) FirstOrInit() (*db_model.SysUserPlatform, error) {
+func (sysUserPlatform sysUserPlatformDo) FirstOrInit() (*model.SysUserPlatform, error) {
 	if result, err := sysUserPlatform.DO.FirstOrInit(); err != nil {
 		return nil, err
 	} else {
-		return result.(*db_model.SysUserPlatform), nil
+		return result.(*model.SysUserPlatform), nil
 	}
 }
 
-func (sysUserPlatform sysUserPlatformDo) FirstOrCreate() (*db_model.SysUserPlatform, error) {
+func (sysUserPlatform sysUserPlatformDo) FirstOrCreate() (*model.SysUserPlatform, error) {
 	if result, err := sysUserPlatform.DO.FirstOrCreate(); err != nil {
 		return nil, err
 	} else {
-		return result.(*db_model.SysUserPlatform), nil
+		return result.(*model.SysUserPlatform), nil
 	}
 }
 
-func (sysUserPlatform sysUserPlatformDo) FindByPage(offset int, limit int) (result []*db_model.SysUserPlatform, count int64, err error) {
+func (sysUserPlatform sysUserPlatformDo) FindByPage(offset int, limit int) (result []*model.SysUserPlatform, count int64, err error) {
 	result, err = sysUserPlatform.Offset(offset).Limit(limit).Find()
 	if err != nil {
 		return
@@ -319,7 +319,7 @@ func (sysUserPlatform sysUserPlatformDo) Scan(result interface{}) (err error) {
 	return sysUserPlatform.DO.Scan(result)
 }
 
-func (sysUserPlatform sysUserPlatformDo) Delete(models ...*db_model.SysUserPlatform) (result gen.ResultInfo, err error) {
+func (sysUserPlatform sysUserPlatformDo) Delete(models ...*model.SysUserPlatform) (result gen.ResultInfo, err error) {
 	return sysUserPlatform.DO.Delete(models)
 }
 
