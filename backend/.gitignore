@@ -48,3 +48,7 @@ tmp/
 .DS_Store
 Thumbs.db
 cmd/seed/main.go
+
+# 实际配置（含数据库密码等敏感信息，禁止入库）
+config/config.yaml
+test/config.yaml
