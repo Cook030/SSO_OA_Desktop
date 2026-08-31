@@ -78,7 +78,7 @@ func AuthMiddleware(svc *service.AuthService) gin.HandlerFunc {
 
 		claims, err := svc.ValidateAccessToken(accessToken)
 		if err != nil {
-			var biz *service.BizError
+			var biz *utils.BizError
 			if errors.As(err, &biz) {
 				utils.Unauthorized(c, biz.Msg)
 			} else {

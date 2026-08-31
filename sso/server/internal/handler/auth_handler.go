@@ -125,8 +125,8 @@ func (h *AuthHandler) RevokeUserSessions(c *gin.Context) {
 // requestMeta 提取请求元信息（审计与限流用），超长字段按列宽截断
 func requestMeta(c *gin.Context) service.RequestMeta {
 	return service.RequestMeta{
-		IP:        truncateStr(c.ClientIP(), 64),
-		UserAgent: truncateStr(c.Request.UserAgent(), 512),
+		IP:        utils.Truncate(c.ClientIP(), 64),
+		UserAgent: utils.Truncate(c.Request.UserAgent(), 512),
 		RequestID: middleware.GetRequestID(c),
 	}
 }
@@ -182,14 +182,6 @@ func parseSameSite(s string) http.SameSite {
 	}
 }
 
-// truncateStr 按字节长度截断字符串
-func truncateStr(s string, n int) string {
-	if len(s) > n {
-		return s[:n]
-	}
-	return s
-}
-
 // writeResult 统一输出业务结果
 func (h *AuthHandler) writeResult(c *gin.Context, data interface{}, err error) {
 	if err != nil {
@@ -202,7 +194,7 @@ func (h *AuthHandler) writeResult(c *gin.Context, data interface{}, err error) {
 // writeErr 统一错误输出：BizError 按业务码返回，其余按 500 处理；
 // 日志不打印密码、完整 token 等敏感信息
 func (h *AuthHandler) writeErr(c *gin.Context, err error) {
-	var biz *service.BizError
+	var biz *utils.BizError
 	if errors.As(err, &biz) {
 		utils.Error(c, biz.Code, biz.Msg)
 		return

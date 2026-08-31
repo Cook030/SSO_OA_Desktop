@@ -1,6 +1,5 @@
-package model
-
-// 状态常量定义（与需求文档保持一致）
+// Package consts 存放 SSO 业务状态常量（会话/令牌状态、审计事件类型）。
+package consts
 
 // 审计事件类型（对应 sys_audit_log.action）
 const (
@@ -12,7 +11,7 @@ const (
 	AuditEventChangePassword = "change_password"
 )
 
-// sso_session.status
+// 会话状态（SessionRecord.Status）
 const (
 	SessionStatusInvalid   = 0 // 无效
 	SessionStatusActive    = 1 // 有效
@@ -21,7 +20,7 @@ const (
 	SessionStatusExpired   = 4 // 已过期
 )
 
-// sso_refresh_token.status
+// refresh token 状态（RefreshTokenRecord.Status）
 const (
 	RefreshTokenStatusInvalid = 0 // 无效
 	RefreshTokenStatusActive  = 1 // 有效

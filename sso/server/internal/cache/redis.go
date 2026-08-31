@@ -1,7 +1,8 @@
-// Package cache 封装 Redis 缓存、并发锁与登录限流。
+// Package cache 封装 Redis 访问：会话与 refresh token 以 Redis 为权威存储，
+// 其余为 introspect 缓存、并发锁与登录限流。
 //
-// Redis 不是权威数据源，仅用于加速与防护；所有操作失败均降级处理
-// （缓存未命中回源 MySQL、限流放行、锁降级放行），保证核心认证流程可用。
+// 会话/令牌读写失败会向上返回错误（无 MySQL 兜底，调用方按 500/401 处理）；
+// introspect 缓存、登录限流、并发锁仅用于加速与防护，失败降级放行，保证核心认证流程可用。
 package cache
 
 import (
@@ -16,13 +17,6 @@ import (
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 )
-
-// SessionCacheData sso:session:{sessionId} 缓存内容
-type SessionCacheData struct {
-	UserID          uint64 `json:"userId"`
-	Status          int    `json:"status"`
-	PasswordVersion int    `json:"passwordVersion"`
-}
 
 // IntrospectCacheData sso:introspect:{accessTokenHash} 缓存内容
 type IntrospectCacheData struct {
@@ -60,7 +54,7 @@ func NewCache(cfg *utils.RedisConfig, log *zap.Logger) *Cache {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	if err := rdb.Ping(ctx).Err(); err != nil {
-		log.Warn("Redis 连接失败，缓存/限流/并发锁将降级运行（核心认证走 MySQL）",
+		log.Warn("Redis 连接失败：会话与 refresh token 将不可用，缓存/限流/并发锁降级运行",
 			zap.String("addr", cfg.Addr), zap.Error(err))
 	} else {
 		log.Info("Redis 连接成功", zap.String("addr", cfg.Addr))
@@ -89,48 +83,6 @@ func (c *Cache) onOK() {
 	if c.degraded.Load() {
 		c.degraded.Store(false)
 	}
-}
-
-// ---------- Session 缓存 ----------
-
-// GetSessionCache 读取 session 缓存；未命中或 Redis 异常时返回 ok=false（调用方回源 MySQL）
-func (c *Cache) GetSessionCache(sessionID string) (SessionCacheData, bool) {
-	var data SessionCacheData
-	raw, err := c.rdb.Get(context.Background(), sessionKey(sessionID)).Bytes()
-	if err != nil {
-		c.onError("get_session", err)
-		return data, false
-	}
-	c.onOK()
-	if err := json.Unmarshal(raw, &data); err != nil {
-		return data, false
-	}
-	return data, true
-}
-
-// SetSessionCache 写入 session 缓存，TTL 与会话过期时间对齐
-func (c *Cache) SetSessionCache(sessionID string, data SessionCacheData, ttl time.Duration) {
-	if ttl <= 0 {
-		return
-	}
-	raw, err := json.Marshal(data)
-	if err != nil {
-		return
-	}
-	if err := c.rdb.Set(context.Background(), sessionKey(sessionID), raw, ttl).Err(); err != nil {
-		c.onError("set_session", err)
-		return
-	}
-	c.onOK()
-}
-
-// DeleteSessionCache 删除 session 缓存（登出/撤销/改密时调用）
-func (c *Cache) DeleteSessionCache(sessionID string) {
-	if err := c.rdb.Del(context.Background(), sessionKey(sessionID)).Err(); err != nil {
-		c.onError("del_session", err)
-		return
-	}
-	c.onOK()
 }
 
 // ---------- Introspect 缓存 ----------
@@ -289,10 +241,15 @@ func (c *Cache) ReleaseRefreshLock(tokenHash, requestID string) {
 // ---------- Key 构造 ----------
 
 func sessionKey(sessionID string) string        { return "sso:session:" + sessionID }
+func refreshTokenKey(tokenHash string) string   { return "sso:rt:" + tokenHash }
+func sessionTokenKey(sessionID string) string   { return "sso:rt_family:" + sessionID }
 func introspectKey(tokenHash string) string     { return "sso:introspect:" + tokenHash }
 func refreshLockKey(tokenHash string) string    { return "sso:refresh_lock:" + tokenHash }
 func loginFailAccountKey(account string) string { return "sso:login_fail:account:" + account }
 func loginFailIPKey(ip string) string           { return "sso:login_fail:ip:" + ip }
+func userSessionKey(userID uint64) string {
+	return "sso:user_sessions:" + strconv.FormatUint(userID, 10)
+}
 func passwordVersionKey(userID uint64) string {
 	return "sso:user:password_version:" + strconv.FormatUint(userID, 10)
 }
