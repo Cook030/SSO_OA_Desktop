@@ -1,7 +1,7 @@
 version: "0.1"
 
 database:
-  dsn: "maplehaze:Mhint@123@tcp(127.0.0.1:3307)/ssp?parseTime=true"
+  dsn: "root:MySQLpassword@123456@tcp(127.0.0.1:3306)/oa_manage?charset=utf8mb4&parseTime=true"
   db: "mysql"
 
   tables:
