@@ -1,0 +1,42 @@
+{
+  "extends": "./tsconfig.base.json",
+  // "compilerOptions": {
+  //   "moduleResolution": "bundler", // 关键：替代 baseUrl 的现代模式
+  //   "paths": {
+  //     // "@mh-repo/ui": ["./packages/ui/src/"],
+  //     // "@mh-repo/ui/*": ["./packages/ui/src/*"],
+  //     "@/*": ["./src/*"], // 路径别名（和 baseUrl 效果一样）
+  //     "*": ["./*"] // 支持根目录直接导入
+  //     // "@mh-repo/utils": ["packages/utils/src/index.ts"],
+  //     // "@mh-repo/utils/*": ["packages/utils/src/*"],
+  //     // "@mh-repo/types": ["packages/types/src/index.ts"],
+  //     // "@mh-repo/types/*": ["packages/types/src/*"],
+  //     // "@mh-repo/apis": ["packages/apis/src/index.ts"],
+  //     // "@mh-repo/apis/*": ["packages/apis/src/*"]
+  //   },
+  //   "target": "ESNext",
+  //   "module": "ESNext",
+
+  //   // "target": "esnext",
+  //   // "module": "esnext",
+  //   // "resolveJsonModule": true,
+  //   // "allowJs": true,
+  //   "esModuleInterop": true,
+  //   "strict": true,
+  //   "sourceMap": true
+  // }
+  "compilerOptions": {
+    "types": ["node", "graphql"],
+    // "baseUrl": ".",
+    "paths": {
+      "@mh-repo/ui": ["../../packages/ui/src"],
+      "@mh-repo/ui/*": ["../../packages/ui/src/*"],
+      "@mh-repo/utils": ["../../packages/utils/src"],
+      "@mh-repo/utils/*": ["../../packages/utils/src/*"],
+      "@mh-repo/types": ["../../packages/types/src"],
+      "@mh-repo/types/*": ["../../packages/types/src/*"],
+      "@mh-repo/apis": ["../../packages/apis/src"],
+      "@mh-repo/apis/*": ["../../packages/apis/src/*"]
+    }
+  }
+}

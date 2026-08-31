@@ -1,0 +1,55 @@
+{
+  "employees": [
+    {
+      "id": 1,
+      "account": "admin",
+      "password": "$2b$10$dummy",
+      "name": "司马锤锤",
+      "phone": "13800000001",
+      "email": "admin@maplehaze.cn",
+      "role": "admin",
+      "department": "总裁办"
+    },
+    {
+      "id": 2,
+      "account": "songjiangjiang",
+      "password": "$2b$10$dummy",
+      "name": "宋江江",
+      "phone": "15678395639",
+      "email": "songjiangjiang@maplehaze.cn",
+      "role": "employee",
+      "department": "技术部"
+    },
+    {
+      "id": 3,
+      "account": "likuikui",
+      "password": "$2b$10$dummy",
+      "name": "李奎奎",
+      "phone": "16678395603",
+      "email": "likuikui@maplehaze.cn",
+      "role": "employee",
+      "department": "销售部"
+    },
+    {
+      "id": 4,
+      "account": "yuqilin",
+      "password": "$2b$10$dummy",
+      "name": "玉麒麟",
+      "phone": "15878395612",
+      "email": "yuqilin@maplehaze.cn",
+      "role": "employee",
+      "department": "运营部"
+    }
+  ],
+  "platforms": [
+    { "id": 1, "name": "A平台", "link": "a-platform" },
+    { "id": 2, "name": "B平台", "link": "b-platform" },
+    { "id": 3, "name": "C平台", "link": "c-platform" }
+  ],
+  "userPlatforms": [
+    { "id": 1, "user_id": 2, "platform_id": 1 },
+    { "id": 2, "user_id": 2, "platform_id": 2 },
+    { "id": 3, "user_id": 3, "platform_id": 1 },
+    { "id": 4, "user_id": 4, "platform_id": 2 }
+  ]
+}

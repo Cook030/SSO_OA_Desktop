@@ -1,0 +1,3 @@
+query sspCore_interactionconfiglist_query {
+  sspCore_interactionconfiglist
+}

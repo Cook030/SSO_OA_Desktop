@@ -1,0 +1,141 @@
+.toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  row-gap: 8px;
+  gap: 8px;
+  padding-bottom: 16px;
+}
+
+.search {
+  width: 180px;
+
+  :global(.custom-input-wrapper) {
+    width: 100%;
+  }
+}
+
+.searchIcon {
+  color: rgba(0, 0, 0, 0.25);
+  font-size: 14px;
+}
+
+.select {
+  width: 146px;
+}
+
+.filterButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filterIcon {
+  display: inline-flex;
+  align-items: center;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.tableWrap {
+  min-height: 290px;
+}
+
+.table {
+  :global(.ant-table) {
+    background: transparent;
+  }
+
+  :global(.ant-table-container) {
+    border-inline-start: 0;
+    border-inline-end: 0;
+  }
+
+  :global(.ant-table-thead > tr > th) {
+    padding: 12px 10px;
+    background: #fafafa;
+    color: #333;
+    font-size: 14px;
+    font-weight: 500;
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  :global(.ant-table-tbody > tr > td) {
+    padding: 10px 10px 8px;
+    color: #333;
+    font-size: 14px;
+    border-bottom: 1px solid #f0f0f0;
+    vertical-align: top;
+  }
+
+  :global(.ant-table-tbody > tr:hover > td) {
+    background: #fafafa;
+  }
+}
+
+.mediaCell {
+  min-width: 0;
+}
+
+.mediaName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 22px;
+}
+
+.mediaId {
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #8c8c8c;
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.actions {
+  display: inline-flex;
+
+  :global(.ant-btn) {
+    padding: 0;
+    height: auto;
+    font-size: 14px;
+    line-height: 22px;
+  }
+}
+
+.dangerAction {
+  :global(.ant-btn) {
+    color: inherit;
+  }
+}
+
+.paginationBar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  padding-top: 12px;
+  min-height: 48px;
+}
+
+.total {
+  color: rgba(0, 0, 0, 0.65);
+  font-size: 14px;
+  line-height: 22px;
+}
+
+@media (max-width: 960px) {
+  .toolbar {
+    flex-wrap: wrap;
+  }
+
+  .search,
+  .select {
+    width: 100%;
+  }
+
+  .tableWrap {
+    overflow-x: auto;
+  }
+}

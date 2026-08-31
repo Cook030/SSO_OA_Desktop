@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node", "graphql"],
+    // "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@assets/*": ["./src/assets/*"],
+      "@mh-repo/ui": ["../../packages/ui/src"],
+      "@mh-repo/ui/*": ["../../packages/ui/src/*"],
+      "@mh-repo/utils": ["../../packages/utils/src"],
+      "@mh-repo/utils/*": ["../../packages/utils/src/*"],
+      "@mh-repo/types": ["../../packages/types/src"],
+      "@mh-repo/types/*": ["../../packages/types/src/*"],
+      "@mh-repo/apis": ["../../packages/apis/src"],
+      "@mh-repo/apis/*": ["../../packages/apis/src/*"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["dist", "node_modules"]
+}

@@ -1,0 +1,14 @@
+pre-commit:
+  jobs:
+    - name: biome
+      glob: "*.{js,jsx,ts,tsx,json,css,md,mjs,cjs}"
+      stage_fixed: true
+      run: pnpm biome check --write {staged_files}
+
+    - name: typecheck
+      run: pnpm typecheck
+
+commit-msg:
+  jobs:
+    - name: commitlint
+      run: pnpm exec commitlint --edit {1}

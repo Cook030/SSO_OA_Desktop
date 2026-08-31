@@ -1,0 +1,11 @@
+/* 全局样式 */
+@import "./App.css";
+
+/* Tailwind CSS 基础样式 */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+svg {
+  vertical-align: baseline;
+}

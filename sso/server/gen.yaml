@@ -1,0 +1,25 @@
+version: "0.1"
+
+database:
+  dsn: "maplehaze:Mhint@123@tcp(127.0.0.1:3307)/ssp?parseTime=true"
+  db: "mysql"
+
+  tables:
+    - sys_user
+    - sys_role
+    - sys_permission
+    - sys_user_role
+    - sys_role_permission
+    - sys_audit_log
+    - sys_user_platform
+    - sys_platform
+
+  outPath: "./internal/db_model"
+  outFile: ""
+  withUnitTest: false
+  modelPkgName: "db_model"
+
+  onlyModel: false
+  fieldNullable: true
+  fieldWithIndexTag: false
+  fieldWithTypeTag: false

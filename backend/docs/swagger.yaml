@@ -1,0 +1,631 @@
+basePath: /api
+definitions:
+  request.BatchDeleteRequest:
+    properties:
+      platformIds:
+        items:
+          type: integer
+        type: array
+      userIds:
+        items:
+          type: integer
+        type: array
+    type: object
+  request.BatchSetRequest:
+    properties:
+      platformIds:
+        items:
+          type: integer
+        type: array
+      userIds:
+        items:
+          type: integer
+        type: array
+    type: object
+  request.CreateEmployeeRequest:
+    properties:
+      account:
+        type: string
+      department:
+        type: string
+      emailPrefix:
+        type: string
+      name:
+        type: string
+      password:
+        type: string
+      phone:
+        type: string
+      platformIds:
+        items:
+          type: integer
+        type: array
+    type: object
+  request.PlatformRequest:
+    properties:
+      link:
+        type: string
+      name:
+        type: string
+    type: object
+  request.UpdateEmployeeRequest:
+    properties:
+      account:
+        type: string
+      department:
+        type: string
+      emailPrefix:
+        type: string
+      name:
+        type: string
+      phone:
+        type: string
+      platformIds:
+        items:
+          type: integer
+        type: array
+    type: object
+  response.BatchPermissionResultDTO:
+    properties:
+      affectedCount:
+        type: integer
+    type: object
+  response.CreateEmployeeDTO:
+    properties:
+      account:
+        type: string
+      displayId:
+        type: string
+      email:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+    type: object
+  response.EmployeeListItemDTO:
+    properties:
+      account:
+        type: string
+      department:
+        type: string
+      displayId:
+        type: string
+      email:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      phone:
+        type: string
+      platformPermissions:
+        items:
+          $ref: '#/definitions/response.PlatformPermission'
+        type: array
+    type: object
+  response.EmployeePageResult:
+    properties:
+      list:
+        items:
+          $ref: '#/definitions/response.EmployeeListItemDTO'
+        type: array
+      total:
+        type: integer
+    type: object
+  response.PlatformDTO:
+    properties:
+      id:
+        type: integer
+      link:
+        type: string
+      name:
+        type: string
+    type: object
+  response.PlatformListItemDTO:
+    properties:
+      createTime:
+        type: string
+      id:
+        type: integer
+      link:
+        type: string
+      name:
+        type: string
+      permissionCount:
+        type: integer
+    type: object
+  response.PlatformPageResult:
+    properties:
+      list:
+        items:
+          $ref: '#/definitions/response.PlatformListItemDTO'
+        type: array
+      total:
+        type: integer
+    type: object
+  response.PlatformPermission:
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+    type: object
+  response.UpdateEmployeeDTO:
+    properties:
+      account:
+        type: string
+      department:
+        type: string
+      displayId:
+        type: string
+      email:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      phone:
+        type: string
+    type: object
+  utils.Response:
+    properties:
+      code:
+        type: integer
+      data: {}
+      message:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  description: 这是一个基于 Go + Gin 的权限管理系统 API，支持用户认证、平台管理、员工管理和权限管理等功能。
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: 权限管理系统 API
+  version: "1.0"
+paths:
+  /employees:
+    get:
+      consumes:
+      - application/json
+      description: 分页获取员工列表，支持搜索和筛选
+      parameters:
+      - description: 页码，默认1
+        in: query
+        name: page
+        type: integer
+      - description: 每页数量，默认20
+        in: query
+        name: pageSize
+        type: integer
+      - description: 搜索关键词
+        in: query
+        name: keyword
+        type: string
+      - description: 部门筛选
+        in: query
+        name: department
+        type: string
+      - description: 平台ID筛选
+        in: query
+        name: platformId
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.EmployeePageResult'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+      security:
+      - CookieAuth: []
+      summary: 获取员工列表
+      tags:
+      - 员工管理
+    post:
+      consumes:
+      - application/json
+      description: 创建新的员工账号
+      parameters:
+      - description: 员工信息
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.CreateEmployeeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.CreateEmployeeDTO'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+      security:
+      - CookieAuth: []
+      summary: 创建员工
+      tags:
+      - 员工管理
+  /employees/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: 删除指定员工及其平台权限
+      parameters:
+      - description: 员工ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+      security:
+      - CookieAuth: []
+      summary: 删除员工
+      tags:
+      - 员工管理
+    put:
+      consumes:
+      - application/json
+      description: 更新员工信息和平台权限
+      parameters:
+      - description: 员工ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 员工信息
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.UpdateEmployeeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.UpdateEmployeeDTO'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+      security:
+      - CookieAuth: []
+      summary: 更新员工
+      tags:
+      - 员工管理
+  /employees/{id}/reset-password:
+    put:
+      consumes:
+      - application/json
+      description: 将指定员工的密码重置为默认密码，password_changed 置为 false，员工下次登录需修改密码
+      parameters:
+      - description: 员工ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+      security:
+      - CookieAuth: []
+      summary: 重置员工密码
+      tags:
+      - 员工管理
+  /employees/departments:
+    get:
+      consumes:
+      - application/json
+      description: 获取所有部门名称列表
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  items:
+                    type: string
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+      security:
+      - CookieAuth: []
+      summary: 获取部门列表
+      tags:
+      - 员工管理
+  /employees/permissions/batch:
+    delete:
+      consumes:
+      - application/json
+      description: 为多个用户批量删除指定的平台权限
+      parameters:
+      - description: 权限删除请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.BatchDeleteRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.BatchPermissionResultDTO'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+      security:
+      - CookieAuth: []
+      summary: 批量删除平台权限
+      tags:
+      - 权限管理
+    post:
+      consumes:
+      - application/json
+      description: 为多个用户批量分配平台权限（增量模式）
+      parameters:
+      - description: 权限设置请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.BatchSetRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.BatchPermissionResultDTO'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+      security:
+      - CookieAuth: []
+      summary: 批量设置平台权限
+      tags:
+      - 权限管理
+  /platforms:
+    get:
+      consumes:
+      - application/json
+      description: 分页获取平台列表
+      parameters:
+      - description: 页码，默认1
+        in: query
+        name: page
+        type: integer
+      - description: 每页数量，默认20
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.PlatformPageResult'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+      security:
+      - CookieAuth: []
+      summary: 获取平台列表
+      tags:
+      - 平台管理
+    post:
+      consumes:
+      - application/json
+      description: 创建新的平台
+      parameters:
+      - description: 平台信息
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.PlatformRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.PlatformDTO'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+      security:
+      - CookieAuth: []
+      summary: 创建平台
+      tags:
+      - 平台管理
+  /platforms/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: 删除指定平台
+      parameters:
+      - description: 平台ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+      security:
+      - CookieAuth: []
+      summary: 删除平台
+      tags:
+      - 平台管理
+    put:
+      consumes:
+      - application/json
+      description: 更新平台信息
+      parameters:
+      - description: 平台ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 平台信息
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.PlatformRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.PlatformDTO'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+      security:
+      - CookieAuth: []
+      summary: 更新平台
+      tags:
+      - 平台管理
+schemes:
+- http
+securityDefinitions:
+  CookieAuth:
+    description: SSO Access Token Cookie 认证（后端仅认 Cookie，不再解析 Authorization Header）
+    in: cookie
+    name: mh_sso2_access_token
+    type: apiKey
+swagger: "2.0"

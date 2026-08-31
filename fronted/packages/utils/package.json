@@ -1,0 +1,17 @@
+{
+  "name": "@mh-repo/utils",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "module": "dist/index.es.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch"
+  },
+  "dependencies": {
+    "react": "catalog"
+  },
+  "devDependencies": {
+    "typescript": "catalog"
+  }
+}

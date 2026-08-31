@@ -1,0 +1,3 @@
+query mhSso2_authMe_query {
+  mhSso2_authMe
+}

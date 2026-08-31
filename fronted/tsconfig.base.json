@@ -1,0 +1,60 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "declaration": true,
+    "declarationMap": true,
+    // "types": ["react", "react-dom"],
+    // "paths": {
+    //   "@mh-repo/ui": ["packages/ui/src/"],
+    //   "@mh-repo/ui/*": ["packages/ui/src/*"],
+    //   // "@/*": ["./src/*"], // 路径别名（和 baseUrl 效果一样）
+    //   // "*": ["./*"] // 支持根目录直接导入
+    //   "@mh-repo/utils": ["packages/utils/src/index.ts"],
+    //   "@mh-repo/utils/*": ["packages/utils/src/*"],
+    //   "@mh-repo/types": ["packages/types/src/index.ts"],
+    //   "@mh-repo/types/*": ["packages/types/src/*"],
+    //   "@mh-repo/apis": ["packages/apis/src/index.ts"],
+    //   "@mh-repo/apis/*": ["packages/apis/src/*"]
+    // },
+    "sourceMap": true
+    // "baseUrl": ".",
+    // "composite": true,
+    // "tsBuildInfoFile": "./build/.tsbuildinfo"
+  },
+  // "compilerOptions": {
+  //   "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+  //   "target": "ES2022",
+  //   "useDefineForClassFields": true,
+  //   "lib": ["ES2022", "DOM", "DOM.Iterable"],
+  //   "module": "ESNext",
+  //   "skipLibCheck": true,
+
+  //   /* Bundler mode */
+  //   "moduleResolution": "bundler",
+  //   "allowImportingTsExtensions": true,
+  //   "verbatimModuleSyntax": true,
+  //   "moduleDetection": "force",
+  //   "noEmit": true,
+  //   "jsx": "react-jsx",
+
+  //   /* Linting */
+  //   "strict": true,
+  //   "noUnusedLocals": true,
+  //   "noUnusedParameters": true,
+  //   "erasableSyntaxOnly": true,
+  //   "noFallthroughCasesInSwitch": true,
+  //   "noUncheckedSideEffectImports": true
+  // },
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules", "**/*.json", "dist", "build"]
+}

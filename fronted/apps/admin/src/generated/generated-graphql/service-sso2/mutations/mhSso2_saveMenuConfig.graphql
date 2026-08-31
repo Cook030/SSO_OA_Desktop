@@ -1,0 +1,3 @@
+mutation mhSso2_saveMenuConfig_mutation($input: mhSso2_JSON) {
+  mhSso2_saveMenuConfig(input: $input)
+}

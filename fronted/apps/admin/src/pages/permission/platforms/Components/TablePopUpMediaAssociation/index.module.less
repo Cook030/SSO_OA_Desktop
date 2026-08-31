@@ -1,0 +1,50 @@
+.media-association-modal {
+  :global(.ant-modal-container) {
+    height: 692px;
+  }
+}
+
+.media-association-transfer {
+  :global(.ant-transfer-list-body-customize-wrapper) {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0;
+  }
+
+  :global(.ant-dropdown-trigger) {
+    display: none !important;
+  }
+}
+
+.transfer-panel-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.transfer-tree-container {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px 16px;
+
+  :global(.ant-tree) {
+    background: transparent;
+  }
+}
+
+.transfer-pagination {
+  flex-shrink: 0;
+  padding: 12px 16px;
+  border-top: 1px solid #f0f0f0;
+  display: flex;
+  justify-content: flex-end;
+
+  :global(.ant-pagination-simple .ant-pagination-simple-pager input) {
+    width: 25px !important;
+    text-align: center;
+  }
+}

@@ -1,0 +1,45 @@
+server:
+  port: 8080
+  mode: release            # release / debug
+
+mysql:
+  host: 127.0.0.1
+  port: 3306
+  username: root
+  password: ""
+  database: sso
+  charset: utf8mb4
+  max_idle_conns: 10
+  max_open_conns: 100
+
+redis:
+  addr: 127.0.0.1:6379
+  password: ""
+  db: 0
+  pool_size: 20
+
+auth:
+  issuer: "mh-sso"
+  jwt_secret: "${JWT_SECRET}"              # 生产必须通过环境变量注入
+  access_token_ttl_second: 900             # access token 15 分钟
+  refresh_token_ttl_second: 2592000        # refresh token 30 天
+  session_ttl_second: 2592000              # 会话 30 天（滑动续期）
+  internal_token: "${SSO_INTERNAL_TOKEN}"  # 内部服务令牌（/introspect、/revoke-user-sessions）
+  cookie_domain: ".maplehaze.cn"           # 生产 Cookie 域；留空则使用当前域名
+  cookie_secure: true                      # HTTPS 环境启用 Secure；本地 HTTP 必须 false
+  cookie_same_site: "Lax"                  # Lax / Strict / None
+
+cors:
+  allow_origins:
+    - "https://oa.maplehaze.cn"
+    - "https://sso.maplehaze.cn"
+    - "http://local-nextui.maplehaze.cn:8004"
+  allow_credentials: true                  # 携带 Cookie 跨域必须为 true，且 Origin 禁止 *
+
+log:
+  path: logs/sso.log
+  max_size: 100
+  max_backups: 10
+  max_age: 30
+  compress: false
+  local_time: true

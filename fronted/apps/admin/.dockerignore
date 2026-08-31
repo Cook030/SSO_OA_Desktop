@@ -1,0 +1,19 @@
+# 排除所有的 .log 文件
+*.log
+
+# 排除 node_modules 目录
+node_modules/
+
+# 排除所有 .git 目录
+.git/
+
+# 排除特定文件
+*.md
+*.txt
+
+# 排除构建输出目录
+/dist
+/build
+
+# 排除临时文件
+tmp/

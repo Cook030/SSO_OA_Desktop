@@ -1,0 +1,156 @@
+.summary {
+  padding-bottom: 10px;
+}
+
+.summaryRow {
+  min-width: 0;
+}
+
+.summaryMain {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.appThumb {
+  width: 42px;
+  height: 42px;
+  border-radius: 6px;
+  background: #d9d9d9;
+}
+
+.summaryContent {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.titleRow {
+  min-width: 0;
+}
+
+.appName {
+  color: rgba(0, 0, 0, 0.88);
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.tag {
+  margin-inline-end: 0 !important;
+}
+
+.metaRow {
+  margin-top: 2px;
+}
+
+.metaText {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.metaDivider {
+  width: 1px;
+  height: 10px;
+  background: #d9d9d9;
+}
+
+.status {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.statusDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #52c41a;
+}
+
+.statusText {
+  color: rgba(0, 0, 0, 0.88);
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.body {
+  max-height: 390px;
+  overflow-y: auto;
+}
+
+.section {
+  padding-bottom: 2px;
+}
+
+.sectionTitle {
+  display: inline-block;
+  margin-bottom: 12px;
+  color: rgba(0, 0, 0, 0.88);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 22px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 24px;
+}
+
+.item {
+  min-width: 0;
+}
+
+.itemFull {
+  grid-column: 1 / -1;
+}
+
+.label {
+  display: block;
+  margin-bottom: 2px;
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.value {
+  color: rgba(0, 0, 0, 0.88);
+  font-size: 14px;
+  line-height: 22px;
+  word-break: break-word;
+}
+
+.divider {
+  margin: 14px 0 12px !important;
+}
+
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 390px;
+}
+
+.emptyText {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 14px;
+  line-height: 22px;
+}
+
+@media (max-width: 768px) {
+  .summaryRow {
+    align-items: flex-start !important;
+    flex-direction: column;
+  }
+
+  .body {
+    max-height: 55vh;
+  }
+
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .itemFull {
+    grid-column: auto;
+  }
+}

@@ -1,0 +1,32 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: permission-test-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: test_password_123
+      MYSQL_DATABASE: maplehaze_permission_test
+    ports:
+      - "13306:3306"
+    volumes:
+      - ./data/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./data/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-ptest_password_123"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    tmpfs:
+      - /var/lib/mysql
+
+  test-runner:
+    build:
+      context: ..
+      dockerfile: test/Dockerfile.test-runner
+    container_name: permission-test-runner
+    environment:
+      TEST_CONFIG_PATH: /app/test/config.yaml
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ./config.yaml:/app/test/config.yaml:ro

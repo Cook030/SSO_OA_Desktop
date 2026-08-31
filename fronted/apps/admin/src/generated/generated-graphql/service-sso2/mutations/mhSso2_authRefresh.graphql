@@ -1,0 +1,3 @@
+mutation mhSso2_authRefresh_mutation($input: mhSso2_mutationInput_authRefresh_input_Input) {
+  mhSso2_authRefresh(input: $input)
+}

@@ -1,0 +1,44 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies
+node_modules
+
+# Build output
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.idea
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.codebuddy
+
+# vite 打包分析产物
+stats.html
+
+# vite-plugin-pwa 和 workbox-window 生成的鸡肋
+dev-dist
+distvite
+
+# ts 的产物
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# 环境变量（本地配置不入仓）
+.env
+.env.local
+.env.*.local

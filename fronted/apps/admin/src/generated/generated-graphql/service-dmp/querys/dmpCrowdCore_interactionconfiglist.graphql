@@ -1,0 +1,3 @@
+query dmpCrowdCore_interactionconfiglist_query {
+  dmpCrowdCore_interactionconfiglist
+}

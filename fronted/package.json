@@ -1,0 +1,76 @@
+{
+  "name": "v4-monorepo",
+  "private": true,
+  "version": "0.0.0",
+  "packageManager": "pnpm@10.8.0",
+  "type": "module",
+  "homepage": "https://adhome.maplehaze.cn/manage/v4/",
+  "scripts": {
+    "lint": "biome check --write .",
+    "lint:check": "biome check .",
+    "lint:spellcheck": "cspell lint \"(packages|apps)/**/*.{js,ts,mjs,cjs,json,css,less,scss,tsx,html,md}\"",
+    "check": "tsc --incremental --noEmit",
+    "typecheck": "pnpm  -r --parallel typecheck",
+    "commit": "git-cz",
+    "rollup:build": "node ./scripts/rollup/build.js",
+    "rollup:dev": "node ./scripts/rollup/dev.js",
+    "dev:container": "pnpm --filter container dev",
+    "dev:dsp": "pnpm --filter dsp dev",
+    "dev:demo": "pnpm --filter demo dev",
+    "dev:sso2": "pnpm --filter sso2 dev",
+    "dev:ssp": "pnpm --filter ssp dev",
+    "dev:qiankun": "pnpm dev:container & pnpm dev:dsp & pnpm dev:ssp",
+    "dev": "pnpm  -r --parallel dev",
+    "build": "pnpm  -r --parallel build",
+    "preview:build": "pnpm  -r --parallel preview:build",
+    "preview:preview": "pnpm  -r --parallel preview:preview",
+    "preview": "pnpm  -r --parallel preview",
+    "graphql:doc": "pnpm  -r --parallel graphql:doc",
+    "graphql:codegen": "pnpm  -r --parallel graphql:codegen",
+    "graphql:rebuild": "pnpm  -r --parallel graphql:rebuild",
+    "release": "changeset publish",
+    "turbo:build": "turbo build",
+    "turbo:dev": "turbo dev --parallel",
+    "turbo:lint": "turbo lint",
+    "turbo:clean": "turbo clean && pnpm -r exec rimraf node_modules .turbo dist",
+    "turbo:release": "changeset publish",
+    "turbo:prepare": "lefthook install --reset-hooks-path",
+    "mock": "node server.js"
+  },
+  "config": {
+    "commitizen": {
+      "path": "node_modules/cz-git"
+    }
+  },
+  "devDependencies": {
+    "@biomejs/biome": "catalog",
+    "@changesets/cli": "catalog",
+    "@commitlint/cli": "catalog",
+    "@commitlint/config-conventional": "catalog",
+    "@cspell/dict-lorem-ipsum": "catalog",
+    "@types/node": "catalog",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "autoprefixer": "catalog",
+    "commitizen": "catalog",
+    "concurrently": "catalog",
+    "cspell": "catalog",
+    "cz-git": "catalog",
+    "graphql": "catalog",
+    "json-server": "1.0.0-beta.15",
+    "lefthook": "catalog",
+    "postcss": "catalog",
+    "rimraf": "catalog",
+    "tailwindcss": "catalog",
+    "turbo": "catalog",
+    "typescript": "catalog"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0",
+    "pnpm": ">=10.0.0"
+  },
+  "dependencies": {
+    "axios": "^1.18.1"
+  }
+}

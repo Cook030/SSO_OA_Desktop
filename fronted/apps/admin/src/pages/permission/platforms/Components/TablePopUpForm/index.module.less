@@ -1,0 +1,48 @@
+.form {
+  :global(.ant-form-item:last-child) {
+    margin-bottom: 0;
+  }
+
+  :global(.ant-form-item-label > label) {
+    height: auto;
+    color: rgba(0, 0, 0, 0.88);
+    font-size: 14px;
+    line-height: 22px;
+  }
+
+  :global(.custom-input-wrapper) {
+    width: 100%;
+  }
+
+  :global(.ant-input),
+  :global(.ant-input-textarea textarea) {
+    font-size: 14px;
+  }
+}
+
+.formItem {
+  margin-bottom: 16px;
+}
+
+.requiredLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.requiredMark {
+  color: #ff4d4f;
+  line-height: 1;
+}
+
+.radioGroup {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 24px;
+
+  :global(.ant-radio-wrapper) {
+    margin-inline-start: 0;
+    color: rgba(0, 0, 0, 0.85);
+    font-size: 14px;
+  }
+}

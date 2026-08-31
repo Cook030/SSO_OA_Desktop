@@ -1,0 +1,95 @@
+.modal {
+  :global(.ant-modal-content) {
+    padding: 0;
+    overflow: hidden;
+    border-radius: 8px;
+  }
+
+  :global(.ant-modal-container) {
+    padding: 16px 24px 12px;
+  }
+
+  :global(.ant-modal-body) {
+    padding: 0;
+  }
+
+  // 焦点陷阱会把焦点移到 .ant-modal 容器上，antd6 会为其绘制 focus-visible 外轮廓。
+  // 弹框壳层不需要展示聚焦环，内部按钮/输入框仍保留各自的 focus 样式。
+  :global(.ant-modal:focus),
+  :global(.ant-modal:focus-visible) {
+    outline: none;
+  }
+}
+
+.wrapper {
+  position: relative;
+}
+
+.header {
+  padding-bottom: 16px;
+  border-bottom: 1px solid #eeeff1;
+}
+
+.headerWithExtra {
+  padding-right: 32px;
+}
+
+.headerInner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 22px;
+}
+
+.title {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: rgba(0, 0, 0, 0.88);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 22px;
+}
+
+.headerExtraAnchor {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
+}
+
+.content {
+  padding: 20px 0;
+}
+
+.contentNoHeader {
+  padding-top: 0;
+}
+
+.footer {
+  padding-top: 12px;
+  border-top: 1px solid #eeeff1;
+
+  :global(.ant-btn) {
+    height: 32px;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+}
+
+.closeButton {
+  width: 24px;
+  height: 24px;
+  padding: 0 !important;
+  line-height: 1;
+  color: rgba(0, 0, 0, 0.45);
+
+  &:focus:not(:focus-visible) {
+    outline: none;
+    box-shadow: none;
+  }
+}
+
+.closeButton:hover {
+  color: rgba(0, 0, 0, 0.88);
+}

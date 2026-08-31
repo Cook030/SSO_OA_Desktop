@@ -1,0 +1,52 @@
+# 本地配置（含密钥）不入库
+config/config.yaml
+
+# 日志与运行时产物
+logs/
+*.log
+
+# 编译产物
+sso-server
+sso-server-linux
+
+# 覆盖率
+coverage.html
+
+# Go vendor
+vendor/
+
+# 热重载临时目录（air 等工具）
+tmp/
+
+# 环境变量文件
+.env
+*.env
+
+# 文档（只保留 README.md）
+*.md
+!README.md
+
+# IDE
+.idea/
+.reasonix/
+.vscode/
+*.swp
+*~
+
+# 图片文件
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.svg
+*.ico
+*.webp
+*.tiff
+*.tif
+*.avif
+
+# 系统文件
+.DS_Store
+Thumbs.db
+cmd/seed/main.go

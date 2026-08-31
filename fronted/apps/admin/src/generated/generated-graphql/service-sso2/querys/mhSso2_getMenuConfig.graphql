@@ -1,0 +1,3 @@
+query mhSso2_getMenuConfig_query {
+  mhSso2_getMenuConfig
+}

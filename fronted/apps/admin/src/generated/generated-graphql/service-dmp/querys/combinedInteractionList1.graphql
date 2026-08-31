@@ -1,0 +1,5 @@
+query combinedInteractionList1_query {
+  combinedInteractionList1 {
+    content
+  }
+}

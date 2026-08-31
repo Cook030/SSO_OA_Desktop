@@ -1,0 +1,52 @@
+server:
+  port: 8080
+  mode: release
+
+log:
+  path: "logs/app.log"
+  max_size: 100
+  max_backups: 10
+  max_age: 30
+  compress: true
+  local_time: true
+
+mysql:
+  host: pc-2zec97555354c4g16.rwlb.rds.aliyuncs.com
+  port: 3306
+  username: maplehaze
+  password: Mhint@123
+  database: ssp
+  charset: utf8mb4
+  max_idle_conns: 10
+  max_open_conns: 100
+
+admin:
+  account: admin
+  password: Mhint@123       # 管理员初始密码
+  name: 管理员
+  phone: "13800000000"                # 替换为管理员手机号
+  email: admin@maplehaze.cn
+
+cors:
+  allow_origins:
+    - "https://oa.maplehaze.cn"
+    - "http://local-nextui.maplehaze.cn:8004"   # 本地/开发前端（sso 接口设计文档示例）
+  allow_methods:
+    - "GET"
+    - "POST"
+    - "PUT"
+    - "DELETE"
+    - "OPTIONS"
+  allow_headers:
+    - "Origin"
+    - "Content-Type"
+    - "Accept"
+  expose_headers: []
+  allow_credentials: true             # 允许携带 Cookie 等凭证时，allow_origins 不能为 *，必须显式指定
+  max_age: 86400
+
+sso:
+  base_url: "http://mh-sso2-svc"
+  introspect_path: "/api/v1/auth/introspect"
+  revoke_user_sessions_path: "/api/v1/auth/revoke-user-sessions"
+  timeout_second: 5

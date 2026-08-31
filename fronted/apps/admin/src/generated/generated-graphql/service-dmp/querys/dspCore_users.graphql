@@ -1,0 +1,3 @@
+query dspCore_users_query {
+  dspCore_users
+}

@@ -1,0 +1,3 @@
+mutation mhSso2_authLogout_mutation($input: mhSso2_mutationInput_authLogout_input_Input) {
+  mhSso2_authLogout(input: $input)
+}

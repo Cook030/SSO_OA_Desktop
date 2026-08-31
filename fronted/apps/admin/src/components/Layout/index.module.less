@@ -1,0 +1,29 @@
+.dsp-app-layout {
+  height: 100vh;
+  overflow: hidden;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+}
+
+.dsp-app-layout--qiankun {
+  height: calc(100vh - 65px);
+}
+
+.dsp-layout-shell {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background-color: transparent;
+}
+
+.dsp-content {
+  min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: transparent;
+  transition: all 0.2s ease;
+  padding-bottom: 16px !important;
+}
