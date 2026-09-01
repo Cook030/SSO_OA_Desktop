@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"mh-sso-svc/internal/cache"
@@ -69,22 +70,27 @@ func (s *AuthService) Register(req RegisterRequest) (*RegisterResult, error) {
 
 	// 唯一性预检查（username 必查；email/mobile 非空时查询）
 	type uniqueCheck struct {
-		field  string
+		field  string // 内部字段名，用于日志检索
+		label  string // 用户可读字段名，用于提示文案
 		value  string
 		exists func(string) (bool, error)
 	}
 	for _, check := range []uniqueCheck{
-		{"username", req.Username, s.userRepo.ExistsByAccount},
-		{"email", req.Email, s.userRepo.ExistsByEmail},
-		{"mobile", req.Mobile, s.userRepo.ExistsByPhone},
+		{"username", "用户名", req.Username, s.userRepo.ExistsByAccount},
+		{"email", "邮箱", req.Email, s.userRepo.ExistsByEmail},
+		{"mobile", "手机号", req.Mobile, s.userRepo.ExistsByPhone},
 	} {
 		if check.value == "" {
 			continue
 		}
 		exists, err := check.exists(check.value)
 		if err != nil {
-			s.log.Error("查询用户唯一性失败", zap.String("field", check.field), zap.Error(err))
-			return nil, utils.NewBizError(utils.CodeServerError, "服务器内部错误")
+			s.log.Error("注册唯一性校验失败",
+				zap.String("field", check.field),
+				zap.String("label", check.label),
+				zap.Error(err))
+			return nil, utils.NewBizError(utils.CodeServerError,
+				fmt.Sprintf("%s可用性校验失败，请稍后重试", check.label))
 		}
 		if exists {
 			return nil, utils.NewBizError(utils.CodeConflict, "用户已存在")
