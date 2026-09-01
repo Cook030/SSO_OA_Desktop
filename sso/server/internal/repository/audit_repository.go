@@ -15,7 +15,7 @@ func NewAuditRepository(q *query.Query) *AuditRepository {
 	return &AuditRepository{q: q}
 }
 
-// AuditRecord SSO 侧审计记录入参（兼容原 SsoLoginAudit 语义）
+// AuditRecord SSO 侧审计记录入参
 type AuditRecord struct {
 	UserID     *uint64
 	Account    *string
