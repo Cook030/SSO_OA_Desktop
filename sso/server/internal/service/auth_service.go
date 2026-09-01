@@ -85,12 +85,7 @@ func (s *AuthService) Register(req RegisterRequest) (*RegisterResult, error) {
 		}
 		exists, err := check.exists(check.value)
 		if err != nil {
-			s.log.Error("注册唯一性校验失败",
-				zap.String("field", check.field),
-				zap.String("label", check.label),
-				zap.Error(err))
-			return nil, utils.NewBizError(utils.CodeServerError,
-				fmt.Sprintf("%s可用性校验失败，请稍后重试", check.label))
+			return nil, fmt.Errorf("注册唯一性校验失败(field=%s): %w", check.field, err)
 		}
 		if exists {
 			return nil, utils.NewBizError(utils.CodeConflict, "用户已存在")
@@ -99,8 +94,7 @@ func (s *AuthService) Register(req RegisterRequest) (*RegisterResult, error) {
 
 	passwordHash, err := utils.HashPassword(req.Password)
 	if err != nil {
-		s.log.Error("密码加密失败", zap.Error(err))
-		return nil, utils.NewBizError(utils.CodeServerError, "服务器内部错误")
+		return nil, fmt.Errorf("注册密码加密失败: %w", err)
 	}
 
 	user := &model.SysUser{
@@ -119,8 +113,7 @@ func (s *AuthService) Register(req RegisterRequest) (*RegisterResult, error) {
 		if repository.IsDuplicateEntryError(err) {
 			return nil, utils.NewBizError(utils.CodeConflict, "用户已存在")
 		}
-		s.log.Error("创建用户失败", zap.Error(err))
-		return nil, utils.NewBizError(utils.CodeServerError, "服务器内部错误")
+		return nil, fmt.Errorf("创建用户失败(account=%s): %w", user.Account, err)
 	}
 
 	s.log.Info("用户注册成功", zap.Uint64("user_id", user.ID), zap.String("username", user.Account))
@@ -146,8 +139,7 @@ func (s *AuthService) Login(account, password string, meta RequestMeta) (*LoginR
 	// 2. 查询用户（account / email / phone）
 	user, err := s.userRepo.FindByAccount(account)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		s.log.Error("查询用户失败", zap.Error(err))
-		return nil, utils.NewBizError(utils.CodeServerError, "服务器内部错误")
+		return nil, fmt.Errorf("登录查询用户失败(account=%s): %w", account, err)
 	}
 
 	// 3. 校验密码（账号不存在时做恒定耗时比对，防时序探测）
@@ -165,15 +157,13 @@ func (s *AuthService) Login(account, password string, meta RequestMeta) (*LoginR
 	sessionID, refreshToken, err := s.sessionSvc.CreateLoginSession(
 		user, meta.IP, meta.UserAgent, s.sessionTTL(), s.refreshTTL(), now)
 	if err != nil {
-		s.log.Error("创建会话失败", zap.Uint64("user_id", user.ID), zap.Error(err))
-		return nil, utils.NewBizError(utils.CodeServerError, "服务器内部错误")
+		return nil, fmt.Errorf("登录创建会话失败(uid=%d): %w", user.ID, err)
 	}
 
 	// 5. 签发 access token
 	accessToken, _, _, err := s.tokenSvc.GenerateAccessToken(user.ID, sessionID, user.Account, int(user.PasswordVersion), now)
 	if err != nil {
-		s.log.Error("签发 access token 失败", zap.Uint64("user_id", user.ID), zap.Error(err))
-		return nil, utils.NewBizError(utils.CodeServerError, "服务器内部错误")
+		return nil, fmt.Errorf("登录签发 access token 失败(uid=%d): %w", user.ID, err)
 	}
 
 	// 6. 登录成功：清理失败计数 + 记审计
@@ -219,8 +209,7 @@ func (s *AuthService) Refresh(refreshToken string, meta RequestMeta) (*RefreshRe
 		if errors.Is(err, cache.ErrRecordNotFound) {
 			return nil, utils.NewBizError(utils.CodeUnauthorized, "invalid refresh token")
 		}
-		s.log.Error("查询 refresh token 失败", zap.Error(err))
-		return nil, utils.NewBizError(utils.CodeServerError, "服务器内部错误")
+		return nil, fmt.Errorf("查询 refresh token 失败: %w", err)
 	}
 
 	// 2. 重放检测：已轮换 token 再次使用 -> 撤销整个 family 与会话
@@ -240,8 +229,7 @@ func (s *AuthService) Refresh(refreshToken string, meta RequestMeta) (*RefreshRe
 	session, err := s.cache.GetSession(rt.SessionID)
 	if err != nil {
 		if !errors.Is(err, cache.ErrRecordNotFound) {
-			s.log.Error("查询会话失败", zap.Error(err))
-			return nil, utils.NewBizError(utils.CodeServerError, "服务器内部错误")
+			return nil, fmt.Errorf("刷新查询会话失败(sid=%s): %w", rt.SessionID, err)
 		}
 		return nil, utils.NewBizError(utils.CodeUnauthorized, "session invalid")
 	}
@@ -255,8 +243,7 @@ func (s *AuthService) Refresh(refreshToken string, meta RequestMeta) (*RefreshRe
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, utils.NewBizError(utils.CodeUnauthorized, "user not found")
 		}
-		s.log.Error("查询用户失败", zap.Uint64("user_id", rt.UserID), zap.Error(err))
-		return nil, utils.NewBizError(utils.CodeServerError, "服务器内部错误")
+		return nil, fmt.Errorf("刷新查询用户失败(uid=%d): %w", rt.UserID, err)
 	}
 
 	// 5. 并发锁：防止同一 refresh token 并发刷新
@@ -268,8 +255,7 @@ func (s *AuthService) Refresh(refreshToken string, meta RequestMeta) (*RefreshRe
 	// 6. 二次确认状态（拿到锁后 token 可能已被并发请求旋转）
 	rtLatest, err := s.cache.GetRefreshToken(tokenHash)
 	if err != nil {
-		s.log.Error("二次查询 refresh token 失败", zap.Error(err))
-		return nil, utils.NewBizError(utils.CodeServerError, "服务器内部错误")
+		return nil, fmt.Errorf("二次查询 refresh token 失败: %w", err)
 	}
 	if rtLatest.Status == consts.RefreshTokenStatusRotated {
 		s.sessionSvc.handleRefreshReplay(rtLatest, meta)
@@ -283,15 +269,13 @@ func (s *AuthService) Refresh(refreshToken string, meta RequestMeta) (*RefreshRe
 	newRefreshToken, err := s.sessionSvc.RotateRefreshToken(
 		tokenHash, rt.UserID, rt.SessionID, s.sessionTTL(), s.refreshTTL(), now)
 	if err != nil {
-		s.log.Error("轮换 refresh token 失败", zap.Uint64("user_id", rt.UserID), zap.Error(err))
-		return nil, utils.NewBizError(utils.CodeServerError, "服务器内部错误")
+		return nil, fmt.Errorf("轮换 refresh token 失败(uid=%d): %w", rt.UserID, err)
 	}
 
 	// 8. 签发新 access token
 	accessToken, _, _, err := s.tokenSvc.GenerateAccessToken(user.ID, rt.SessionID, user.Account, int(user.PasswordVersion), now)
 	if err != nil {
-		s.log.Error("签发 access token 失败", zap.Uint64("user_id", user.ID), zap.Error(err))
-		return nil, utils.NewBizError(utils.CodeServerError, "服务器内部错误")
+		return nil, fmt.Errorf("刷新签发 access token 失败(uid=%d): %w", user.ID, err)
 	}
 
 	// 9. 记审计
@@ -355,14 +339,12 @@ func (s *AuthService) ChangePassword(userID uint64, password, confirmPassword st
 
 	passwordHash, err := utils.HashPassword(password)
 	if err != nil {
-		s.log.Error("密码加密失败", zap.Uint64("user_id", userID), zap.Error(err))
-		return utils.NewBizError(utils.CodeServerError, "服务器内部错误")
+		return fmt.Errorf("修改密码加密失败(uid=%d): %w", userID, err)
 	}
 
 	// 更新密码（password_version + 1 由 SQL 保证原子递增）
 	if err := s.userRepo.UpdatePassword(userID, passwordHash); err != nil {
-		s.log.Error("更新密码失败", zap.Uint64("user_id", userID), zap.Error(err))
-		return utils.NewBizError(utils.CodeServerError, "服务器内部错误")
+		return fmt.Errorf("更新密码失败(uid=%d): %w", userID, err)
 	}
 
 	// 撤销该用户全部会话与 refresh token，修改后必须重新登录
@@ -379,8 +361,7 @@ func (s *AuthService) Me(userID uint64) (*MeResult, error) {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, utils.NewBizError(utils.CodeUnauthorized, "用户不存在")
 		}
-		s.log.Error("查询用户失败", zap.Uint64("user_id", userID), zap.Error(err))
-		return nil, utils.NewBizError(utils.CodeServerError, "服务器内部错误")
+		return nil, fmt.Errorf("查询当前用户失败(uid=%d): %w", userID, err)
 	}
 
 	return &MeResult{

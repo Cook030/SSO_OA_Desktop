@@ -203,5 +203,5 @@ func (h *AuthHandler) writeErr(c *gin.Context, err error) {
 		zap.String("path", c.Request.URL.Path),
 		zap.String("request_id", middleware.GetRequestID(c)),
 		zap.Error(err))
-	utils.ServerError(c, "服务器内部错误")
+	utils.ServerError(c, utils.ErrMsgServerError)
 }

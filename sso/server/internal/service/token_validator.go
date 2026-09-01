@@ -2,12 +2,12 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"mh-sso-svc/internal/cache"
 	"mh-sso-svc/internal/utils"
 
-	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
@@ -37,8 +37,7 @@ func (s *AuthService) ValidateAccessToken(accessToken string) (*AccessClaims, er
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, utils.NewBizError(utils.CodeUnauthorized, "user not found")
 		}
-		s.log.Error("查询用户失败", zap.Uint64("user_id", claims.UserID), zap.Error(err))
-		return nil, utils.NewBizError(utils.CodeServerError, "服务器内部错误")
+		return nil, fmt.Errorf("校验 access token 查询用户失败(uid=%d): %w", claims.UserID, err)
 	}
 	if user.PasswordVersion != int32(claims.PasswordVersion) {
 		// 回写最新版本，加速后续旧 token 否决

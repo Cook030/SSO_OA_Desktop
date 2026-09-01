@@ -79,12 +79,12 @@ func AuthMiddleware(svc *service.AuthService) gin.HandlerFunc {
 		claims, err := svc.ValidateAccessToken(accessToken)
 		if err != nil {
 			var biz *utils.BizError
-			if errors.As(err, &biz) {
+			if errors.As(err, &biz) && biz.Code == utils.CodeUnauthorized {
 				utils.Unauthorized(c, biz.Msg)
 			} else {
 				utils.GetLogger().Error("access token 校验异常",
 					zap.String("path", c.Request.URL.Path), zap.Error(err))
-				utils.ServerError(c, "服务器内部错误")
+				utils.ServerError(c, utils.ErrMsgServerError)
 			}
 			c.Abort()
 			return
