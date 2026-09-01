@@ -33,28 +33,15 @@ func (r *AuditRepository) Create(record *AuditRecord) error {
 	if !record.Success {
 		result = 0
 	}
+	targetType := "user"
 	return r.q.SysAuditLog.Create(&model.SysAuditLog{
 		UserID:       record.UserID,
 		Action:       record.Action,
-		TargetType:   strPtr("user"),
-		TargetID:     accountID(record.Account),
+		TargetType:   &targetType,
+		TargetID:     record.Account,
 		IP:           record.IP,
 		RequestID:    record.RequestID,
 		Result:       result,
 		ErrorMessage: record.FailReason,
 	})
-}
-
-func strPtr(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
-}
-
-func accountID(account *string) *string {
-	if account == nil || *account == "" {
-		return nil
-	}
-	return account
 }
