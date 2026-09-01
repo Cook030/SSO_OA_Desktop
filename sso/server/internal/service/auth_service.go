@@ -21,14 +21,14 @@ const dummyHash = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy"
 
 // AuthService SSO 认证核心服务编排层。
 // 仅负责用例编排（Register/Login/Refresh/Logout/ChangePassword/Me/RevokeUserSessions）与错误翻译；
-// 会话/令牌生命周期委托给 SessionManager，token 校验委托给 TokenService，审计写入委托给 AuditRepository。
+// 会话/令牌生命周期委托给 SessionService，token 校验委托给 TokenService，审计写入委托给 AuditRepository。
 type AuthService struct {
 	q          *query.Query
 	userRepo   *repository.UserRepository
 	auditRepo  *repository.AuditRepository
 	cache      *cache.Cache
 	tokenSvc   *TokenService
-	sessionMgr *SessionManager
+	sessionSvc *SessionService
 	cfg        *utils.AuthConfig
 	log        *zap.Logger
 }
@@ -46,8 +46,8 @@ func NewAuthService(db *gorm.DB, rdb *cache.Cache, tokenSvc *TokenService, cfg *
 		log:       utils.GetLogger(),
 	}
 	// 会话管理器注入审计回调，实现职责分离
-	s.sessionMgr = NewSessionManager(rdb, s.log)
-	s.sessionMgr.SetAuditRecorder(s.recordAudit)
+	s.sessionSvc = NewSessionService(rdb, s.log)
+	s.sessionSvc.SetAuditRecorder(s.recordAudit)
 	return s
 }
 
@@ -156,7 +156,7 @@ func (s *AuthService) Login(account, password string, meta RequestMeta) (*LoginR
 	now := time.Now()
 
 	// 4. 创建会话与 refresh token（原子：任一写入失败则整体失败，不产生残缺状态）
-	sessionID, refreshToken, err := s.sessionMgr.CreateLoginSession(
+	sessionID, refreshToken, err := s.sessionSvc.CreateLoginSession(
 		user, meta.IP, meta.UserAgent, s.sessionTTL(), s.refreshTTL(), now)
 	if err != nil {
 		s.log.Error("创建会话失败", zap.Uint64("user_id", user.ID), zap.Error(err))
@@ -219,7 +219,7 @@ func (s *AuthService) Refresh(refreshToken string, meta RequestMeta) (*RefreshRe
 
 	// 2. 重放检测：已轮换 token 再次使用 -> 撤销整个 family 与会话
 	if rt.Status == consts.RefreshTokenStatusRotated {
-		s.sessionMgr.handleRefreshReplay(rt, meta)
+		s.sessionSvc.handleRefreshReplay(rt, meta)
 		return nil, utils.NewBizError(utils.CodeUnauthorized, "refresh token 已被使用，会话已撤销")
 	}
 	if rt.Status != consts.RefreshTokenStatusActive {
@@ -266,7 +266,7 @@ func (s *AuthService) Refresh(refreshToken string, meta RequestMeta) (*RefreshRe
 		return nil, utils.NewBizError(utils.CodeServerError, "服务器内部错误")
 	}
 	if rtLatest.Status == consts.RefreshTokenStatusRotated {
-		s.sessionMgr.handleRefreshReplay(rtLatest, meta)
+		s.sessionSvc.handleRefreshReplay(rtLatest, meta)
 		return nil, utils.NewBizError(utils.CodeUnauthorized, "refresh token 已被使用，会话已撤销")
 	}
 	if rtLatest.Status != consts.RefreshTokenStatusActive {
@@ -274,7 +274,7 @@ func (s *AuthService) Refresh(refreshToken string, meta RequestMeta) (*RefreshRe
 	}
 
 	// 7. 旋转令牌并续期会话（原子：标记旧 token -> 写新 token -> 续期会话）
-	newRefreshToken, err := s.sessionMgr.RotateRefreshToken(
+	newRefreshToken, err := s.sessionSvc.RotateRefreshToken(
 		tokenHash, rt.UserID, rt.SessionID, s.sessionTTL(), s.refreshTTL(), now)
 	if err != nil {
 		s.log.Error("轮换 refresh token 失败", zap.Uint64("user_id", rt.UserID), zap.Error(err))
@@ -317,7 +317,7 @@ func (s *AuthService) Logout(accessToken, refreshToken string, meta RequestMeta)
 		if claims, err := s.tokenSvc.ParseAccessToken(accessToken); err == nil && claims.UserID > 0 {
 			userID = &claims.UserID
 			account = claims.Account
-			s.sessionMgr.revokeSession(claims.SessionID, consts.SessionStatusLoggedOut)
+			s.sessionSvc.revokeSession(claims.SessionID, consts.SessionStatusLoggedOut)
 		}
 	}
 
@@ -329,7 +329,7 @@ func (s *AuthService) Logout(accessToken, refreshToken string, meta RequestMeta)
 					s.log.Error("登出撤销 refresh token 失败", zap.Uint64("user_id", rt.UserID), zap.Error(err))
 				}
 				if userID == nil {
-					s.sessionMgr.revokeSession(rt.SessionID, consts.SessionStatusLoggedOut)
+					s.sessionSvc.revokeSession(rt.SessionID, consts.SessionStatusLoggedOut)
 					userID = &rt.UserID
 				}
 			}
@@ -360,7 +360,7 @@ func (s *AuthService) ChangePassword(userID uint64, password, confirmPassword st
 	}
 
 	// 撤销该用户全部会话与 refresh token，修改后必须重新登录
-	s.sessionMgr.revokeAllUserSessions(userID, consts.AuditEventChangePassword, meta)
+	s.sessionSvc.revokeAllUserSessions(userID, consts.AuditEventChangePassword, meta)
 	return nil
 }
 
@@ -396,6 +396,6 @@ func (s *AuthService) RevokeUserSessions(userID uint64, meta RequestMeta) error 
 	if userID <= 0 {
 		return utils.NewBizError(utils.CodeBadRequest, "userId is required")
 	}
-	s.sessionMgr.revokeAllUserSessions(userID, consts.AuditEventRevoke, meta)
+	s.sessionSvc.revokeAllUserSessions(userID, consts.AuditEventRevoke, meta)
 	return nil
 }
