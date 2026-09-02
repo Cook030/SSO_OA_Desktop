@@ -36,6 +36,13 @@ type ChangePasswordRequest struct {
 	ConfirmPassword string `json:"confirmPassword" binding:"required"`
 }
 
+// UpdateProfileRequest 更新个人资料请求（姓名/邮箱/手机号）
+type UpdateProfileRequest struct {
+	Nickname string `json:"nickname" binding:"required,max=64"`
+	Email    string `json:"email" binding:"omitempty,email,max=128"`
+	Mobile   string `json:"mobile" binding:"omitempty,min=5,max=32"`
+}
+
 // RevokeUserSessionsRequest 撤销指定用户全部会话请求
 type RevokeUserSessionsRequest struct {
 	UserID uint64 `json:"userId"`

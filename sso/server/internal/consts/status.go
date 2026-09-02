@@ -9,6 +9,7 @@ const (
 	AuditEventRefresh        = "refresh"
 	AuditEventRevoke         = "revoke"
 	AuditEventChangePassword = "change_password"
+	AuditEventUpdateProfile  = "update_profile"
 )
 
 // 会话状态（SessionRecord.Status）

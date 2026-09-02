@@ -3,6 +3,7 @@ package service
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"mh-sso-svc/internal/cache"
@@ -353,6 +354,66 @@ func (s *AuthService) ChangePassword(userID uint64, password, confirmPassword st
 }
 
 // ---------- 当前用户信息 ----------
+
+// UpdateProfile 更新当前用户资料（姓名/邮箱/手机号），返回更新后的用户信息
+func (s *AuthService) UpdateProfile(userID uint64, req UpdateProfileRequest, meta RequestMeta) (*UserInfo, error) {
+	name := strings.TrimSpace(req.Nickname)
+	email := strings.TrimSpace(req.Email)
+	phone := strings.TrimSpace(req.Mobile)
+
+	if name == "" {
+		return nil, utils.NewBizError(utils.CodeBadRequest, "姓名不能为空")
+	}
+
+	// 唯一性校验（排除自身：保留原值也算合法）
+	if email != "" {
+		exists, err := s.userRepo.ExistsByEmailExclude(email, userID)
+		if err != nil {
+			return nil, fmt.Errorf("资料更新邮箱校验失败(uid=%d): %w", userID, err)
+		}
+		if exists {
+			return nil, utils.NewBizError(utils.CodeConflict, "邮箱已被其他账户使用")
+		}
+	}
+	if phone != "" {
+		exists, err := s.userRepo.ExistsByPhoneExclude(phone, userID)
+		if err != nil {
+			return nil, fmt.Errorf("资料更新手机号校验失败(uid=%d): %w", userID, err)
+		}
+		if exists {
+			return nil, utils.NewBizError(utils.CodeConflict, "手机号已被其他账户使用")
+		}
+	}
+
+	user, err := s.userRepo.FindByID(userID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, utils.NewBizError(utils.CodeUnauthorized, "用户不存在")
+		}
+		return nil, fmt.Errorf("资料更新查询用户失败(uid=%d): %w", userID, err)
+	}
+	account := user.Account
+
+	if err := s.userRepo.UpdateProfile(userID, name, utils.EmptyToNil(email), utils.EmptyToNil(phone)); err != nil {
+		// 唯一索引兜底：并发情况下仍可能冲突
+		if repository.IsDuplicateEntryError(err) {
+			return nil, utils.NewBizError(utils.CodeConflict, "邮箱或手机号已被其他账户使用")
+		}
+		return nil, fmt.Errorf("更新资料失败(uid=%d): %w", userID, err)
+	}
+
+	s.recordAudit(&userID, account, consts.AuditEventUpdateProfile, true, "", meta)
+	s.log.Info("用户资料更新成功",
+		zap.Uint64("user_id", userID),
+		zap.String("ip", meta.IP))
+
+	updated, err := s.userRepo.FindByID(userID)
+	if err != nil {
+		return nil, fmt.Errorf("资料更新后查询用户失败(uid=%d): %w", userID, err)
+	}
+	info := buildUserInfo(updated)
+	return &info, nil
+}
 
 // Me 查询当前用户信息
 func (s *AuthService) Me(userID uint64) (*MeResult, error) {

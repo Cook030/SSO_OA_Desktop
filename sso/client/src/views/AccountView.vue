@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
-import { authState, signOut } from "@/stores/auth";
+import { authState, signOut, updateProfile } from "@/stores/auth";
 
 const router = useRouter();
 const signingOut = ref(false);
@@ -14,6 +14,7 @@ const roles = computed(() => authState.profile?.roles ?? []);
 /** 账户信息展示项 */
 const infoItems = computed(() => [
   { label: "账号 Account", value: user.value?.account },
+  { label: "昵称 Name", value: user.value?.name },
   { label: "邮箱 Email", value: user.value?.email || "未填写" },
   { label: "手机号 Mobile", value: user.value?.phone || "未填写" },
   {
@@ -43,6 +44,49 @@ async function onSignOut(): Promise<void> {
     await router.replace({ name: "login" });
   }
 }
+
+// ---------- 编辑资料 ----------
+
+const editing = ref(false);
+const saving = ref(false);
+const editError = ref("");
+
+const editForm = reactive({ nickname: "", email: "", mobile: "" });
+
+function openEdit(): void {
+  editForm.nickname = user.value?.name ?? "";
+  editForm.email = user.value?.email ?? "";
+  editForm.mobile = user.value?.phone ?? "";
+  editError.value = "";
+  editing.value = true;
+}
+
+function closeEdit(): void {
+  if (saving.value) return;
+  editing.value = false;
+}
+
+watch(editing, (open) => {
+  document.body.style.overflow = open ? "hidden" : "";
+});
+
+async function onSave(): Promise<void> {
+  if (saving.value) return;
+  editError.value = "";
+  saving.value = true;
+  try {
+    await updateProfile({
+      nickname: editForm.nickname.trim(),
+      email: editForm.email.trim(),
+      mobile: editForm.mobile.trim(),
+    });
+    editing.value = false;
+  } catch (err) {
+    editError.value = err instanceof Error ? err.message : "保存失败，请稍后重试";
+  } finally {
+    saving.value = false;
+  }
+}
 </script>
 
 <template>
@@ -70,7 +114,10 @@ async function onSignOut(): Promise<void> {
 
       <!-- 账户信息 -->
       <section class="mt-12">
-        <p class="micro-label mb-2">Profile</p>
+        <div class="mb-2 flex items-center justify-between">
+          <p class="micro-label">Profile</p>
+          <button class="btn-ghost" @click="openEdit">编辑资料 Edit</button>
+        </div>
         <dl>
           <div
             v-for="item in infoItems"
@@ -107,6 +154,62 @@ async function onSignOut(): Promise<void> {
         </div>
       </section>
     </main>
+
+    <!-- 编辑资料弹窗 -->
+    <div v-if="editing" class="fixed inset-0 z-50 flex items-center justify-center px-6">
+      <div
+        class="absolute inset-0 bg-ink/30 backdrop-blur-[2px]"
+        @click="closeEdit"
+      />
+      <div class="relative w-full max-w-md border border-line bg-paper px-8 py-8 shadow-xl">
+        <p class="micro-label">Edit profile</p>
+        <h2 class="mt-3 font-display text-3xl font-medium text-ink">编辑资料</h2>
+        <form class="mt-6 space-y-5" @submit.prevent="onSave">
+          <div>
+            <label class="micro-label mb-1 block" for="edit-nickname">昵称 Name</label>
+            <input
+              id="edit-nickname"
+              v-model="editForm.nickname"
+              class="field-input"
+              type="text"
+              maxlength="64"
+              required
+            />
+          </div>
+          <div>
+            <label class="micro-label mb-1 block" for="edit-email">邮箱 Email</label>
+            <input
+              id="edit-email"
+              v-model="editForm.email"
+              class="field-input"
+              type="email"
+              maxlength="128"
+              placeholder="未填写"
+            />
+          </div>
+          <div>
+            <label class="micro-label mb-1 block" for="edit-mobile">手机号 Mobile</label>
+            <input
+              id="edit-mobile"
+              v-model="editForm.mobile"
+              class="field-input"
+              type="tel"
+              maxlength="32"
+              placeholder="未填写"
+            />
+          </div>
+          <p v-if="editError" class="text-[13px] text-red-700">{{ editError }}</p>
+          <div class="flex items-center justify-end gap-6 pt-2">
+            <button type="button" class="btn-ghost" :disabled="saving" @click="closeEdit">
+              取消
+            </button>
+            <button type="submit" class="btn-primary" :disabled="saving">
+              {{ saving ? "保存中…" : "保存" }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
 
     <div class="hairline mx-6 lg:mx-12" />
     <footer class="px-6 py-4 text-[12px] text-mist lg:px-12">

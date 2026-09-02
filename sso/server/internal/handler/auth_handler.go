@@ -95,6 +95,17 @@ func (h *AuthHandler) Me(c *gin.Context) {
 	h.writeResult(c, result, err)
 }
 
+// UpdateProfile 更新当前用户资料（姓名/邮箱/手机号）
+func (h *AuthHandler) UpdateProfile(c *gin.Context) {
+	var req service.UpdateProfileRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.BadRequest(c, fmt.Sprintf("参数解析失败: %v", err))
+		return
+	}
+	result, err := h.svc.UpdateProfile(middleware.GetUserID(c), req, requestMeta(c))
+	h.writeResult(c, result, err)
+}
+
 // Introspect 校验 access token 有效性（内部接口，Bearer 优先）
 func (h *AuthHandler) Introspect(c *gin.Context) {
 	accessToken, errMsg := middleware.ExtractAccessTokenBearerFirst(c)

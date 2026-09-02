@@ -1,7 +1,7 @@
 import { reactive } from "vue";
 
-import type { MeResult, UserInfo } from "@/api/auth";
-import { fetchMe, login as apiLogin, logout as apiLogout } from "@/api/auth";
+import type { MeResult, UserInfo, UpdateProfilePayload } from "@/api/auth";
+import { fetchMe, login as apiLogin, logout as apiLogout, updateProfile as apiUpdateProfile } from "@/api/auth";
 
 interface AuthState {
   /** 当前登录用户；null 表示未登录 */
@@ -23,6 +23,11 @@ export async function signIn(account: string, password: string): Promise<void> {
   const data = await apiLogin(account, password);
   authState.user = data.user;
   authState.profile = null;
+}
+
+/** 更新个人资料并同步用户态 */
+export async function updateProfile(payload: UpdateProfilePayload): Promise<void> {
+  authState.user = await apiUpdateProfile(payload);
 }
 
 /** 退出登录（服务端撤销会话并清除 Cookie） */

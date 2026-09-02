@@ -56,6 +56,17 @@ func (r *UserRepository) UpdatePassword(id uint64, passwordHash string) error {
 	return err
 }
 
+// UpdateProfile 更新用户姓名/邮箱/手机号（显式 map 写入，支持清空为 NULL）
+func (r *UserRepository) UpdateProfile(id uint64, name string, email, phone *string) error {
+	_, err := r.q.SysUser.Where(r.q.SysUser.ID.Eq(id)).
+		Updates(map[string]interface{}{
+			"name":  name,
+			"email": email,
+			"phone": phone,
+		})
+	return err
+}
+
 // ExistsByAccount 登录账号是否已存在
 func (r *UserRepository) ExistsByAccount(account string) (bool, error) {
 	return r.existsBy(r.q.SysUser.Account.Eq(account))
@@ -69,6 +80,22 @@ func (r *UserRepository) ExistsByEmail(email string) (bool, error) {
 // ExistsByPhone 手机号是否已存在
 func (r *UserRepository) ExistsByPhone(phone string) (bool, error) {
 	return r.existsBy(r.q.SysUser.Phone.Eq(phone))
+}
+
+// ExistsByEmailExclude 邮箱是否已被其他用户占用（排除自身，用于资料更新）
+func (r *UserRepository) ExistsByEmailExclude(email string, excludeID uint64) (bool, error) {
+	count, err := r.q.SysUser.
+		Where(r.q.SysUser.Email.Eq(email), r.q.SysUser.ID.Neq(excludeID)).
+		Count()
+	return count > 0, err
+}
+
+// ExistsByPhoneExclude 手机号是否已被其他用户占用（排除自身，用于资料更新）
+func (r *UserRepository) ExistsByPhoneExclude(phone string, excludeID uint64) (bool, error) {
+	count, err := r.q.SysUser.
+		Where(r.q.SysUser.Phone.Eq(phone), r.q.SysUser.ID.Neq(excludeID)).
+		Count()
+	return count > 0, err
 }
 
 func (r *UserRepository) existsBy(cond gen.Condition) (bool, error) {

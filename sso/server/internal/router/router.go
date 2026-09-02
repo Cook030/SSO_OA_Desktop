@@ -56,6 +56,7 @@ func SetupRouter(db *gorm.DB, rdb *cache.Cache, cfg *utils.Config) *gin.Engine {
 		authed.Use(middleware.AuthMiddleware(authSvc))
 		{
 			authed.GET("/me", authHandler.Me)
+			authed.PUT("/me", authHandler.UpdateProfile)
 			authed.POST("/change-password", authHandler.ChangePassword)
 		}
 

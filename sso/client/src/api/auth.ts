@@ -72,3 +72,14 @@ export async function logout(): Promise<void> {
 export async function fetchMe(): Promise<MeResult> {
   return request<MeResult>("/me", { method: "GET" });
 }
+
+export interface UpdateProfilePayload {
+  nickname: string;
+  email?: string;
+  mobile?: string;
+}
+
+/** 更新个人资料（姓名/邮箱/手机号），返回更新后的用户信息 */
+export async function updateProfile(payload: UpdateProfilePayload): Promise<UserInfo> {
+  return request<UserInfo>("/me", { method: "PUT", body: JSON.stringify(payload) });
+}
