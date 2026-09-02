@@ -39,13 +39,11 @@ func (r *UserRepository) FindByID(id uint64) (*model.SysUser, error) {
 
 // FindByAccount 按登录账号查询用户（account / email / phone 任一匹配）
 func (r *UserRepository) FindByAccount(account string) (*model.SysUser, error) {
-	return r.q.SysUser.Where(
-		r.q.SysUser.Or(
-			r.q.SysUser.Account.Eq(account),
-			r.q.SysUser.Email.Eq(account),
-			r.q.SysUser.Phone.Eq(account),
-		),
-	).First()
+	return r.q.SysUser.
+		Where(r.q.SysUser.Account.Eq(account)).
+		Or(r.q.SysUser.Email.Eq(account)).
+		Or(r.q.SysUser.Phone.Eq(account)).
+		First()
 }
 
 // UpdatePassword 更新密码哈希并将密码版本 +1
