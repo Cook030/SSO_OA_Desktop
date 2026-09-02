@@ -59,13 +59,9 @@ func SetupRouter(db *gorm.DB, rdb *cache.Cache, cfg *utils.Config) *gin.Engine {
 			authed.POST("/change-password", authHandler.ChangePassword)
 		}
 
-		// 内部服务接口（X-Internal-Token 鉴权，仅业务后端可调）
-		internal := auth.Group("")
-		internal.Use(middleware.InternalAuthMiddleware(cfg.Auth.InternalToken))
-		{
-			internal.GET("/introspect", authHandler.Introspect)
-			internal.POST("/revoke-user-sessions", authHandler.RevokeUserSessions)
-		}
+		// 供业务后端调用的服务接口。
+		auth.GET("/introspect", authHandler.Introspect)
+		auth.POST("/revoke-user-sessions", authHandler.RevokeUserSessions)
 	}
 
 	return r

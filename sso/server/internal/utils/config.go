@@ -10,10 +10,9 @@ import (
 
 // Cookie 与认证 Header 常量（与 SSO 接口文档保持一致）
 const (
-	AccessTokenCookieName   = "mh_sso_access_token"
-	RefreshTokenCookieName  = "mh_sso_refresh_token"
-	RefreshTokenHeaderName  = "X-MH-Refresh-Token"
-	InternalTokenHeaderName = "X-Internal-Token"
+	AccessTokenCookieName  = "mh_sso_access_token"
+	RefreshTokenCookieName = "mh_sso_refresh_token"
+	RefreshTokenHeaderName = "X-MH-Refresh-Token"
 )
 
 // ServerConfig 服务器配置
@@ -49,7 +48,6 @@ type AuthConfig struct {
 	AccessTokenTTLSecond  int    `mapstructure:"access_token_ttl_second"`
 	RefreshTokenTTLSecond int    `mapstructure:"refresh_token_ttl_second"`
 	SessionTTLSecond      int    `mapstructure:"session_ttl_second"`
-	InternalToken         string `mapstructure:"internal_token"`
 	CookieDomain          string `mapstructure:"cookie_domain"`
 	CookieSecure          bool   `mapstructure:"cookie_secure"`
 	CookieSameSite        string `mapstructure:"cookie_same_site"`
@@ -149,7 +147,7 @@ func (c *Config) applyDefaults() {
 	if len(c.CORS.AllowHeaders) == 0 {
 		c.CORS.AllowHeaders = []string{
 			"Origin", "Content-Type", "Accept", "Authorization",
-			RefreshTokenHeaderName, InternalTokenHeaderName, "X-Request-Id",
+			RefreshTokenHeaderName, "X-Request-Id",
 		}
 	}
 	if c.CORS.MaxAge == 0 {

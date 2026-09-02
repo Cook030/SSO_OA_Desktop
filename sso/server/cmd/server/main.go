@@ -82,7 +82,4 @@ func validateAuthConfig(cfg *utils.AuthConfig, log *zap.Logger) {
 	if len(cfg.JWTSecret) < 32 {
 		log.Warn("auth.jwt_secret 长度不足 32 位，生产环境建议使用更强的随机密钥")
 	}
-	if cfg.InternalToken == "" {
-		log.Fatal("auth.internal_token 未配置：请设置环境变量 SSO_INTERNAL_TOKEN 或在配置文件中填写")
-	}
 }

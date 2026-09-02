@@ -24,7 +24,6 @@ auth:
   access_token_ttl_second: 900             # access token 15 分钟
   refresh_token_ttl_second: 2592000        # refresh token 30 天
   session_ttl_second: 2592000              # 会话 30 天（滑动续期）
-  internal_token: "${SSO_INTERNAL_TOKEN}"  # 内部服务令牌（/introspect、/revoke-user-sessions）
   cookie_domain: ".maplehaze.cn"           # 生产 Cookie 域；留空则使用当前域名
   cookie_secure: true                      # HTTPS 环境启用 Secure；本地 HTTP 必须 false
   cookie_same_site: "Lax"                  # Lax / Strict / None
