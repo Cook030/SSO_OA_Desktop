@@ -28,7 +28,7 @@ func newSysAuditLog(db *gorm.DB, opts ...gen.DOOption) sysAuditLog {
 	tableName := _sysAuditLog.sysAuditLogDo.TableName()
 	_sysAuditLog.ALL = field.NewAsterisk(tableName)
 	_sysAuditLog.ID = field.NewUint64(tableName, "id")
-	_sysAuditLog.UserID = field.NewUint64(tableName, "user_id")
+	_sysAuditLog.OperatorID = field.NewUint64(tableName, "operator_id")
 	_sysAuditLog.Action = field.NewString(tableName, "action")
 	_sysAuditLog.TargetType = field.NewString(tableName, "target_type")
 	_sysAuditLog.TargetID = field.NewString(tableName, "target_id")
@@ -47,18 +47,18 @@ func newSysAuditLog(db *gorm.DB, opts ...gen.DOOption) sysAuditLog {
 type sysAuditLog struct {
 	sysAuditLogDo
 
-	ALL field.Asterisk
-	ID field.Uint64
-	UserID field.Uint64 // 操作人ID
-	Action field.String // 操作类型
-	TargetType field.String // 目标类型
-	TargetID field.String // 目标ID
-	Detail field.String // 变更明细
-	IP field.String // 操作来源IP
-	RequestID field.String // 请求追踪ID
-	Result field.Int32 // 执行结果
+	ALL          field.Asterisk
+	ID           field.Uint64
+	OperatorID   field.Uint64 // 操作人ID
+	Action       field.String // 操作类型
+	TargetType   field.String // 目标类型
+	TargetID     field.String // 目标ID
+	Detail       field.String // 变更明细
+	IP           field.String // 操作来源IP
+	RequestID    field.String // 请求追踪ID
+	Result       field.Int32  // 执行结果
 	ErrorMessage field.String // 失败原因
-	CreateTime field.Time
+	CreateTime   field.Time
 
 	fieldMap map[string]field.Expr
 }
@@ -76,7 +76,7 @@ func (sysAuditLog sysAuditLog) As(alias string) *sysAuditLog {
 func (sysAuditLog *sysAuditLog) updateTableName(table string) *sysAuditLog {
 	sysAuditLog.ALL = field.NewAsterisk(table)
 	sysAuditLog.ID = field.NewUint64(table, "id")
-	sysAuditLog.UserID = field.NewUint64(table, "user_id")
+	sysAuditLog.OperatorID = field.NewUint64(table, "operator_id")
 	sysAuditLog.Action = field.NewString(table, "action")
 	sysAuditLog.TargetType = field.NewString(table, "target_type")
 	sysAuditLog.TargetID = field.NewString(table, "target_id")
@@ -104,7 +104,7 @@ func (sysAuditLog *sysAuditLog) GetFieldByName(fieldName string) (field.OrderExp
 func (sysAuditLog *sysAuditLog) fillFieldMap() {
 	sysAuditLog.fieldMap = make(map[string]field.Expr, 11)
 	sysAuditLog.fieldMap["id"] = sysAuditLog.ID
-	sysAuditLog.fieldMap["user_id"] = sysAuditLog.UserID
+	sysAuditLog.fieldMap["operator_id"] = sysAuditLog.OperatorID
 	sysAuditLog.fieldMap["action"] = sysAuditLog.Action
 	sysAuditLog.fieldMap["target_type"] = sysAuditLog.TargetType
 	sysAuditLog.fieldMap["target_id"] = sysAuditLog.TargetID

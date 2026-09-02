@@ -70,7 +70,7 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 		return
 	}
 	userID := middleware.GetUserID(c)
-	if err := h.svc.ChangePassword(userID, req.Password, req.ConfirmPassword, requestMeta(c)); err != nil {
+	if err := h.svc.ChangePassword(c.Request.Context(), userID, req.Password, req.ConfirmPassword, requestMeta(c)); err != nil {
 		h.writeErr(c, err)
 		return
 	}
@@ -91,7 +91,7 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		utils.BadRequest(c, fmt.Sprintf("参数解析失败: %v", err))
 		return
 	}
-	result, err := h.svc.UpdateProfile(middleware.GetUserID(c), req, requestMeta(c))
+	result, err := h.svc.UpdateProfile(c.Request.Context(), middleware.GetUserID(c), req, requestMeta(c))
 	h.writeResult(c, result, err)
 }
 

@@ -1,11 +1,13 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
 
+	"mh-sso-svc/internal/audit"
 	"mh-sso-svc/internal/cache"
 	"mh-sso-svc/internal/consts"
 	"mh-sso-svc/internal/model/query"
@@ -24,31 +26,31 @@ const dummyHash = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy"
 // 仅负责用例编排（Login/Refresh/Logout/ChangePassword/Me/UpdateProfile/RevokeUserSessions）与错误翻译；
 // 会话/令牌生命周期委托给 SessionService，token 校验委托给 TokenService，审计写入委托给 AuditRepository。
 type AuthService struct {
-	q          *query.Query
-	userRepo   *repository.UserRepository
-	auditRepo  *repository.AuditRepository
-	cache      *cache.Cache
-	tokenSvc   *TokenService
-	sessionSvc *SessionService
-	cfg        *utils.AuthConfig
-	log        *zap.Logger
+	q             *query.Query
+	userRepo      *repository.UserRepository
+	securityAudit *audit.SecurityRecorder
+	cache         *cache.Cache
+	tokenSvc      *TokenService
+	sessionSvc    *SessionService
+	cfg           *utils.AuthConfig
+	log           *zap.Logger
 }
 
 // NewAuthService 创建认证服务（Repository 层在内部组装；db 仅用于构建 gen query）
 func NewAuthService(db *gorm.DB, rdb *cache.Cache, tokenSvc *TokenService, cfg *utils.AuthConfig) *AuthService {
 	q := query.Use(db)
 	s := &AuthService{
-		q:         q,
-		userRepo:  repository.NewUserRepository(q),
-		auditRepo: repository.NewAuditRepository(q),
-		cache:     rdb,
-		tokenSvc:  tokenSvc,
-		cfg:       cfg,
-		log:       utils.GetLogger(),
+		q:        q,
+		userRepo: repository.NewUserRepository(q),
+		cache:    rdb,
+		tokenSvc: tokenSvc,
+		cfg:      cfg,
+		log:      utils.GetLogger(),
 	}
+	s.securityAudit = audit.NewSecurityRecorder(repository.NewAuditRepository(q), s.log)
 	// 会话管理器注入审计回调，实现职责分离
 	s.sessionSvc = NewSessionService(rdb, s.log)
-	s.sessionSvc.SetAuditRecorder(s.recordAudit)
+	s.sessionSvc.SetAuditRecorder(s.recordSecurityAudit)
 	return s
 }
 
@@ -68,7 +70,7 @@ func (s *AuthService) Login(account, password string, meta RequestMeta) (*LoginR
 
 	// 1. 登录失败限流（账号 / IP）
 	if s.cache.IsLoginRateLimited(account, meta.IP) {
-		s.recordAudit(nil, account, consts.AuditEventLoginFailed, false, "rate_limited", meta)
+		s.recordSecurityAudit(nil, account, consts.AuditEventLoginFailed, false, "rate_limited", meta)
 		return nil, utils.NewBizError(utils.CodeUnauthorized, "登录失败次数过多，请5分钟后再试")
 	}
 
@@ -104,7 +106,7 @@ func (s *AuthService) Login(account, password string, meta RequestMeta) (*LoginR
 
 	// 6. 登录成功：清理失败计数 + 记审计
 	s.cache.ClearLoginFailures(account)
-	s.recordAudit(&user.ID, user.Account, consts.AuditEventLoginSuccess, true, "", meta)
+	s.recordSecurityAudit(&user.ID, user.Account, consts.AuditEventLoginSuccess, true, "", meta)
 
 	s.log.Info("登录成功",
 		zap.Uint64("user_id", user.ID),
@@ -124,7 +126,7 @@ func (s *AuthService) Login(account, password string, meta RequestMeta) (*LoginR
 // loginFailed 登录失败统一处理：累计限流计数 + 记审计
 func (s *AuthService) loginFailed(account, reason string, meta RequestMeta) (*LoginResult, error) {
 	s.cache.RecordLoginFailure(account, meta.IP)
-	s.recordAudit(nil, account, consts.AuditEventLoginFailed, false, reason, meta)
+	s.recordSecurityAudit(nil, account, consts.AuditEventLoginFailed, false, reason, meta)
 	return nil, utils.NewBizError(utils.CodeUnauthorized, "账号或密码错误")
 }
 
@@ -215,7 +217,7 @@ func (s *AuthService) Refresh(refreshToken string, meta RequestMeta) (*RefreshRe
 	}
 
 	// 9. 记审计
-	s.recordAudit(&user.ID, user.Account, consts.AuditEventRefresh, true, "", meta)
+	s.recordSecurityAudit(&user.ID, user.Account, consts.AuditEventRefresh, true, "", meta)
 	s.log.Info("refresh token 轮换成功",
 		zap.Uint64("user_id", user.ID),
 		zap.String("session_id", rt.SessionID))
@@ -262,13 +264,13 @@ func (s *AuthService) Logout(accessToken, refreshToken string, meta RequestMeta)
 		}
 	}
 
-	s.recordAudit(userID, account, consts.AuditEventLogout, true, "", meta)
+	s.recordSecurityAudit(userID, account, consts.AuditEventLogout, true, "", meta)
 }
 
 // ---------- 修改密码 ----------
 
 // ChangePassword 修改密码：更新密码并递增版本，随后撤销该用户全部会话与令牌
-func (s *AuthService) ChangePassword(userID uint64, password, confirmPassword string, meta RequestMeta) error {
+func (s *AuthService) ChangePassword(ctx context.Context, userID uint64, password, confirmPassword string, meta RequestMeta) error {
 	if password != confirmPassword {
 		return utils.NewBizError(utils.CodeBadRequest, "两次输入的密码不一致")
 	}
@@ -279,7 +281,7 @@ func (s *AuthService) ChangePassword(userID uint64, password, confirmPassword st
 	}
 
 	// 更新密码（password_version + 1 由 SQL 保证原子递增）
-	if err := s.userRepo.UpdatePassword(userID, passwordHash); err != nil {
+	if err := s.userRepo.UpdatePassword(ctx, userID, passwordHash); err != nil {
 		return fmt.Errorf("更新密码失败(uid=%d): %w", userID, err)
 	}
 
@@ -291,7 +293,7 @@ func (s *AuthService) ChangePassword(userID uint64, password, confirmPassword st
 // ---------- 当前用户信息 ----------
 
 // UpdateProfile 更新当前用户资料（姓名/邮箱/手机号），返回更新后的用户信息
-func (s *AuthService) UpdateProfile(userID uint64, req UpdateProfileRequest, meta RequestMeta) (*UserInfo, error) {
+func (s *AuthService) UpdateProfile(ctx context.Context, userID uint64, req UpdateProfileRequest, meta RequestMeta) (*UserInfo, error) {
 	name := strings.TrimSpace(req.Nickname)
 	email := strings.TrimSpace(req.Email)
 	phone := strings.TrimSpace(req.Mobile)
@@ -329,7 +331,7 @@ func (s *AuthService) UpdateProfile(userID uint64, req UpdateProfileRequest, met
 	}
 	account := user.Account
 
-	if err := s.userRepo.UpdateProfile(userID, name, utils.EmptyToNil(email), utils.EmptyToNil(phone)); err != nil {
+	if err := s.userRepo.UpdateProfile(ctx, userID, name, utils.EmptyToNil(email), utils.EmptyToNil(phone)); err != nil {
 		// 唯一索引兜底：并发情况下仍可能冲突
 		if repository.IsDuplicateEntryError(err) {
 			return nil, utils.NewBizError(utils.CodeConflict, "邮箱或手机号已被其他账户使用")
@@ -337,7 +339,7 @@ func (s *AuthService) UpdateProfile(userID uint64, req UpdateProfileRequest, met
 		return nil, fmt.Errorf("更新资料失败(uid=%d): %w", userID, err)
 	}
 
-	s.recordAudit(&userID, account, consts.AuditEventUpdateProfile, true, "", meta)
+	s.recordSecurityAudit(&userID, account, consts.AuditEventUpdateProfile, true, "", meta)
 	s.log.Info("用户资料更新成功",
 		zap.Uint64("user_id", userID),
 		zap.String("ip", meta.IP))

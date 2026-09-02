@@ -17,7 +17,7 @@ func NewAuditRepository(q *query.Query) *AuditRepository {
 
 // AuditRecord SSO 侧审计记录入参
 type AuditRecord struct {
-	UserID     *uint64
+	OperatorID *uint64
 	Account    *string
 	Action     string
 	Success    bool
@@ -35,7 +35,7 @@ func (r *AuditRepository) Create(record *AuditRecord) error {
 	}
 	targetType := "user"
 	return r.q.SysAuditLog.Create(&model.SysAuditLog{
-		UserID:       record.UserID,
+		OperatorID:   record.OperatorID,
 		Action:       record.Action,
 		TargetType:   &targetType,
 		TargetID:     record.Account,

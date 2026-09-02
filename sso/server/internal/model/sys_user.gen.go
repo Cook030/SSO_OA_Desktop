@@ -12,14 +12,17 @@ const TableNameSysUser = "sys_user"
 
 // SysUser 统一用户表(认证+基础信息,SSO与backend共读)
 type SysUser struct {
-	ID              uint64   `gorm:"column:id;primaryKey;autoIncrement:true" json:"id"`
-	Account         string   `gorm:"column:account;not null;comment:登录账号" json:"account"`                                // 登录账号
-	Password        string   `gorm:"column:password;not null;comment:密码(bcrypt加密,SSO登录校验)" json:"password"`           // 密码(bcrypt加密,SSO登录校验)
-	Name            string   `gorm:"column:name;not null;comment:姓名" json:"name"`                                          // 姓名
-	Phone           *string  `gorm:"column:phone;comment:手机号" json:"phone"`                                               // 手机号
-	Email           *string  `gorm:"column:email;comment:邮箱" json:"email"`                                                 // 邮箱
-	Department      *string  `gorm:"column:department;comment:所属部门" json:"department"`                                     // 所属部门
-	PasswordVersion int32    `gorm:"column:password_version;not null;default:1;comment:密码版本(SSO改密递增,旧token自动失效;>1表示已修改过初始密码)" json:"password_version"` // 密码版本
+	ID              uint64    `gorm:"column:id;primaryKey;autoIncrement:true" json:"id"`
+	Account         string    `gorm:"column:account;not null;comment:登录账号" json:"account"`                                                              // 登录账号
+	Password        string    `gorm:"column:password;not null;comment:密码(bcrypt加密,SSO登录校验)" json:"password"`                                            // 密码(bcrypt加密,SSO登录校验)
+	Name            string    `gorm:"column:name;not null;comment:姓名" json:"name"`                                                                      // 姓名
+	Phone           *string   `gorm:"column:phone;comment:手机号" json:"phone"`                                                                            // 手机号
+	Email           *string   `gorm:"column:email;comment:邮箱" json:"email"`                                                                             // 邮箱
+	Department      *string   `gorm:"column:department;comment:所属部门" json:"department"`                                                                 // 所属部门
+	PasswordVersion int32     `gorm:"column:password_version;not null;default:1;comment:密码版本(SSO改密递增,旧token自动失效;>1表示已修改过初始密码)" json:"password_version"` // 密码版本
+	CreatedBy       *uint64   `gorm:"column:created_by;comment:创建操作人ID" json:"created_by"`                                                              // 创建操作人ID
+	UpdatedBy       *uint64   `gorm:"column:updated_by;comment:最后更新操作人ID" json:"updated_by"`                                                            // 最后更新操作人ID
+	RequestID       *string   `gorm:"column:request_id;comment:最后一次写操作请求ID" json:"request_id"`                                                          // 最后一次写操作请求ID
 	CreateTime      time.Time `gorm:"column:create_time;not null;default:CURRENT_TIMESTAMP" json:"create_time"`
 	UpdateTime      time.Time `gorm:"column:update_time;not null;default:CURRENT_TIMESTAMP" json:"update_time"`
 }

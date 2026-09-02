@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"time"
 
+	"mh-sso-svc/internal/audit"
+
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
@@ -46,6 +48,9 @@ func InitDB(cfg *MySQLConfig, mode string) (*gorm.DB, error) {
 	})
 	if err != nil {
 		return nil, fmt.Errorf("连接数据库失败: %w", err)
+	}
+	if err := audit.RegisterGORMCallbacks(db); err != nil {
+		return nil, fmt.Errorf("注册审计数据库回调失败: %w", err)
 	}
 
 	sqlDB, err := db.DB()

@@ -12,16 +12,16 @@ const TableNameSysAuditLog = "sys_audit_log"
 
 // SysAuditLog 业务操作审计日志表
 type SysAuditLog struct {
-	ID           uint64  `gorm:"column:id;primaryKey;autoIncrement:true" json:"id"`
-	UserID       *uint64 `gorm:"column:user_id;comment:操作人ID" json:"user_id"`                              // 操作人ID
-	Action       string  `gorm:"column:action;not null;comment:操作类型" json:"action"`                       // 操作类型
-	TargetType   *string `gorm:"column:target_type;comment:目标类型" json:"target_type"`                      // 目标类型
-	TargetID     *string `gorm:"column:target_id;comment:目标ID" json:"target_id"`                           // 目标ID
-	Detail       *string `gorm:"column:detail;comment:变更明细" json:"detail"`                                 // 变更明细
-	IP           *string `gorm:"column:ip;comment:操作来源IP" json:"ip"`                                       // 操作来源IP
-	RequestID    *string `gorm:"column:request_id;comment:请求追踪ID" json:"request_id"`                       // 请求追踪ID
-	Result       int32   `gorm:"column:result;not null;default:1;comment:执行结果: 1成功 0失败" json:"result"`    // 执行结果
-	ErrorMessage *string `gorm:"column:error_message;comment:失败原因或错误摘要" json:"error_message"`           // 失败原因
+	ID           uint64    `gorm:"column:id;primaryKey;autoIncrement:true" json:"id"`
+	OperatorID   *uint64   `gorm:"column:operator_id;comment:操作人ID" json:"operator_id"`                  // 操作人ID
+	Action       string    `gorm:"column:action;not null;comment:操作类型" json:"action"`                    // 操作类型
+	TargetType   *string   `gorm:"column:target_type;comment:目标类型" json:"target_type"`                   // 目标类型
+	TargetID     *string   `gorm:"column:target_id;comment:目标ID" json:"target_id"`                       // 目标ID
+	Detail       *string   `gorm:"column:detail;comment:变更明细" json:"detail"`                             // 变更明细
+	IP           *string   `gorm:"column:ip;comment:操作来源IP" json:"ip"`                                   // 操作来源IP
+	RequestID    *string   `gorm:"column:request_id;comment:请求追踪ID" json:"request_id"`                   // 请求追踪ID
+	Result       int32     `gorm:"column:result;not null;default:1;comment:执行结果: 1成功 0失败" json:"result"` // 执行结果
+	ErrorMessage *string   `gorm:"column:error_message;comment:失败原因或错误摘要" json:"error_message"`          // 失败原因
 	CreateTime   time.Time `gorm:"column:create_time;not null;default:CURRENT_TIMESTAMP" json:"create_time"`
 }
 

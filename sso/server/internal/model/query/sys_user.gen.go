@@ -35,6 +35,9 @@ func newSysUser(db *gorm.DB, opts ...gen.DOOption) sysUser {
 	_sysUser.Email = field.NewString(tableName, "email")
 	_sysUser.Department = field.NewString(tableName, "department")
 	_sysUser.PasswordVersion = field.NewInt32(tableName, "password_version")
+	_sysUser.CreatedBy = field.NewUint64(tableName, "created_by")
+	_sysUser.UpdatedBy = field.NewUint64(tableName, "updated_by")
+	_sysUser.RequestID = field.NewString(tableName, "request_id")
 	_sysUser.CreateTime = field.NewTime(tableName, "create_time")
 	_sysUser.UpdateTime = field.NewTime(tableName, "update_time")
 
@@ -46,17 +49,20 @@ func newSysUser(db *gorm.DB, opts ...gen.DOOption) sysUser {
 type sysUser struct {
 	sysUserDo
 
-	ALL field.Asterisk
-	ID field.Uint64
-	Account field.String // 登录账号
-	Password field.String // 密码(bcrypt加密,SSO登录校验)
-	Name field.String // 姓名
-	Phone field.String // 手机号
-	Email field.String // 邮箱
-	Department field.String // 所属部门
-	PasswordVersion field.Int32 // 密码版本
-	CreateTime field.Time
-	UpdateTime field.Time
+	ALL             field.Asterisk
+	ID              field.Uint64
+	Account         field.String // 登录账号
+	Password        field.String // 密码(bcrypt加密,SSO登录校验)
+	Name            field.String // 姓名
+	Phone           field.String // 手机号
+	Email           field.String // 邮箱
+	Department      field.String // 所属部门
+	PasswordVersion field.Int32  // 密码版本
+	CreatedBy       field.Uint64 // 创建操作人ID
+	UpdatedBy       field.Uint64 // 最后更新操作人ID
+	RequestID       field.String // 最后一次写操作请求ID
+	CreateTime      field.Time
+	UpdateTime      field.Time
 
 	fieldMap map[string]field.Expr
 }
@@ -81,6 +87,9 @@ func (sysUser *sysUser) updateTableName(table string) *sysUser {
 	sysUser.Email = field.NewString(table, "email")
 	sysUser.Department = field.NewString(table, "department")
 	sysUser.PasswordVersion = field.NewInt32(table, "password_version")
+	sysUser.CreatedBy = field.NewUint64(table, "created_by")
+	sysUser.UpdatedBy = field.NewUint64(table, "updated_by")
+	sysUser.RequestID = field.NewString(table, "request_id")
 	sysUser.CreateTime = field.NewTime(table, "create_time")
 	sysUser.UpdateTime = field.NewTime(table, "update_time")
 
@@ -99,7 +108,7 @@ func (sysUser *sysUser) GetFieldByName(fieldName string) (field.OrderExpr, bool)
 }
 
 func (sysUser *sysUser) fillFieldMap() {
-	sysUser.fieldMap = make(map[string]field.Expr, 10)
+	sysUser.fieldMap = make(map[string]field.Expr, 13)
 	sysUser.fieldMap["id"] = sysUser.ID
 	sysUser.fieldMap["account"] = sysUser.Account
 	sysUser.fieldMap["password"] = sysUser.Password
@@ -108,6 +117,9 @@ func (sysUser *sysUser) fillFieldMap() {
 	sysUser.fieldMap["email"] = sysUser.Email
 	sysUser.fieldMap["department"] = sysUser.Department
 	sysUser.fieldMap["password_version"] = sysUser.PasswordVersion
+	sysUser.fieldMap["created_by"] = sysUser.CreatedBy
+	sysUser.fieldMap["updated_by"] = sysUser.UpdatedBy
+	sysUser.fieldMap["request_id"] = sysUser.RequestID
 	sysUser.fieldMap["create_time"] = sysUser.CreateTime
 	sysUser.fieldMap["update_time"] = sysUser.UpdateTime
 }

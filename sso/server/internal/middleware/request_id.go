@@ -3,6 +3,7 @@ package middleware
 import (
 	"time"
 
+	"mh-sso-svc/internal/audit"
 	"mh-sso-svc/internal/utils"
 
 	"github.com/gin-gonic/gin"
@@ -20,6 +21,7 @@ func RequestIDMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		requestID := uuid.New().String()
 		c.Set(RequestIDKey, requestID)
+		c.Request = c.Request.WithContext(audit.WithRequestID(c.Request.Context(), requestID))
 		log := utils.GetLogger().With(zap.String("request_id", requestID))
 
 		// 健康检查等高频探活路径不记录访问日志，避免刷屏

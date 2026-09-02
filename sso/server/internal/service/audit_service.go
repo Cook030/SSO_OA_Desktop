@@ -1,25 +1,17 @@
 package service
 
-import (
-	"mh-sso-svc/internal/repository"
-	"mh-sso-svc/internal/utils"
+import "mh-sso-svc/internal/audit"
 
-	"go.uber.org/zap"
-)
-
-// recordAudit 写入审计日志（失败只记错误日志，不阻断主流程）
-func (s *AuthService) recordAudit(userID *uint64, account, eventType string, success bool, failReason string, meta RequestMeta) {
-	record := &repository.AuditRecord{
-		UserID:     userID,
-		Account:    utils.EmptyToNil(utils.Truncate(account, 64)),
+// recordSecurityAudit adapts service metadata to the centralized security
+// audit recorder. Authentication events have no MySQL row change to consume.
+func (s *AuthService) recordSecurityAudit(operatorID *uint64, account, eventType string, success bool, failReason string, meta RequestMeta) {
+	s.securityAudit.Record(audit.SecurityEvent{
+		OperatorID: operatorID,
+		Account:    account,
 		Action:     eventType,
 		Success:    success,
-		FailReason: utils.EmptyToNil(failReason),
-		IP:         utils.EmptyToNil(meta.IP),
-		UserAgent:  utils.EmptyToNil(meta.UserAgent),
-		RequestID:  utils.EmptyToNil(meta.RequestID),
-	}
-	if err := s.auditRepo.Create(record); err != nil {
-		s.log.Error("写入审计日志失败", zap.String("event_type", eventType), zap.Error(err))
-	}
+		FailReason: failReason,
+		IP:         meta.IP,
+		RequestID:  meta.RequestID,
+	})
 }

@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"errors"
 
 	"mh-sso-svc/internal/model"
@@ -47,8 +48,9 @@ func (r *UserRepository) FindByAccount(account string) (*model.SysUser, error) {
 }
 
 // UpdatePassword 更新密码哈希并将密码版本 +1
-func (r *UserRepository) UpdatePassword(id uint64, passwordHash string) error {
-	_, err := r.q.SysUser.Where(r.q.SysUser.ID.Eq(id)).
+func (r *UserRepository) UpdatePassword(ctx context.Context, id uint64, passwordHash string) error {
+	q := r.q.WithContext(ctx)
+	_, err := q.SysUser.Where(r.q.SysUser.ID.Eq(id)).
 		Updates(map[string]interface{}{
 			"password":         passwordHash,
 			"password_version": gorm.Expr("password_version + 1"),
@@ -57,8 +59,9 @@ func (r *UserRepository) UpdatePassword(id uint64, passwordHash string) error {
 }
 
 // UpdateProfile 更新用户姓名/邮箱/手机号（显式 map 写入，支持清空为 NULL）
-func (r *UserRepository) UpdateProfile(id uint64, name string, email, phone *string) error {
-	_, err := r.q.SysUser.Where(r.q.SysUser.ID.Eq(id)).
+func (r *UserRepository) UpdateProfile(ctx context.Context, id uint64, name string, email, phone *string) error {
+	q := r.q.WithContext(ctx)
+	_, err := q.SysUser.Where(r.q.SysUser.ID.Eq(id)).
 		Updates(map[string]interface{}{
 			"name":  name,
 			"email": email,

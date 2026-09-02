@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 
+	"mh-sso-svc/internal/audit"
 	"mh-sso-svc/internal/service"
 	"mh-sso-svc/internal/utils"
 
@@ -93,6 +94,7 @@ func AuthMiddleware(svc *service.AuthService) gin.HandlerFunc {
 		c.Set(CtxUserID, claims.UserID)
 		c.Set(CtxSessionID, claims.SessionID)
 		c.Set(CtxAccount, claims.Account)
+		c.Request = c.Request.WithContext(audit.WithOperatorID(c.Request.Context(), claims.UserID))
 		c.Next()
 	}
 }
