@@ -1,7 +1,13 @@
 import { reactive } from "vue";
 
 import type { MeResult, UserInfo, UpdateProfilePayload } from "@/api/auth";
-import { fetchMe, login as apiLogin, logout as apiLogout, updateProfile as apiUpdateProfile } from "@/api/auth";
+import {
+  changePassword as apiChangePassword,
+  fetchMe,
+  login as apiLogin,
+  logout as apiLogout,
+  updateProfile as apiUpdateProfile,
+} from "@/api/auth";
 
 interface AuthState {
   /** 当前登录用户；null 表示未登录 */
@@ -28,6 +34,13 @@ export async function signIn(account: string, password: string): Promise<void> {
 /** 更新个人资料并同步用户态 */
 export async function updateProfile(payload: UpdateProfilePayload): Promise<void> {
   authState.user = await apiUpdateProfile(payload);
+}
+
+/** 修改密码（成功后服务端撤销全部会话并清除 Cookie，需重新登录） */
+export async function changePassword(password: string, confirmPassword: string): Promise<void> {
+  await apiChangePassword({ password, confirmPassword });
+  authState.user = null;
+  authState.profile = null;
 }
 
 /** 退出登录（服务端撤销会话并清除 Cookie） */

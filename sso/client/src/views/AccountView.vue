@@ -2,7 +2,7 @@
 import { computed, reactive, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
-import { authState, signOut, updateProfile } from "@/stores/auth";
+import { authState, changePassword, signOut, updateProfile } from "@/stores/auth";
 
 const router = useRouter();
 const signingOut = ref(false);
@@ -66,10 +66,6 @@ function closeEdit(): void {
   editing.value = false;
 }
 
-watch(editing, (open) => {
-  document.body.style.overflow = open ? "hidden" : "";
-});
-
 async function onSave(): Promise<void> {
   if (saving.value) return;
   editError.value = "";
@@ -87,6 +83,61 @@ async function onSave(): Promise<void> {
     saving.value = false;
   }
 }
+
+// ---------- 修改密码 ----------
+
+const pwdVisible = ref(false);
+const changingPwd = ref(false);
+const pwdError = ref("");
+
+const pwdForm = reactive({ password: "", confirmPassword: "" });
+
+function openChangePwd(): void {
+  pwdForm.password = "";
+  pwdForm.confirmPassword = "";
+  pwdError.value = "";
+  pwdVisible.value = true;
+}
+
+function closeChangePwd(): void {
+  if (changingPwd.value) return;
+  pwdVisible.value = false;
+}
+
+async function onSubmitPassword(): Promise<void> {
+  if (changingPwd.value) return;
+  pwdError.value = "";
+
+  if (!pwdForm.password) {
+    pwdError.value = "请输入新密码";
+    return;
+  }
+  if (pwdForm.password.length < 6) {
+    pwdError.value = "新密码长度至少 6 位";
+    return;
+  }
+  if (pwdForm.password !== pwdForm.confirmPassword) {
+    pwdError.value = "两次输入的密码不一致";
+    return;
+  }
+
+  changingPwd.value = true;
+  try {
+    await changePassword(pwdForm.password, pwdForm.confirmPassword);
+    pwdVisible.value = false;
+    // 服务端已撤销全部会话并清除 Cookie，需重新登录
+    await router.replace({ name: "login", query: { changed: "1" } });
+  } catch (err) {
+    pwdError.value = err instanceof Error ? err.message : "修改失败，请稍后重试";
+  } finally {
+    changingPwd.value = false;
+  }
+}
+
+// 弹窗打开时锁定背景滚动
+watch([editing, pwdVisible], ([editOpen, pwdOpen]) => {
+  document.body.style.overflow = editOpen || pwdOpen ? "hidden" : "";
+});
 </script>
 
 <template>
@@ -146,11 +197,9 @@ async function onSave(): Promise<void> {
           <p class="micro-label">Security</p>
           <h2 class="mt-3 font-display text-2xl font-medium text-ink">修改密码</h2>
           <p class="mt-2 text-[13px] leading-relaxed text-mist">
-            定期更换密码可提升账户安全。界面即将上线。
+            定期更换密码可提升账户安全。修改成功后需重新登录。
           </p>
-          <span class="mt-4 inline-block text-[11px] uppercase tracking-[0.22em] text-mist">
-            Coming soon
-          </span>
+          <button class="btn-ghost mt-4" @click="openChangePwd">修改密码 →</button>
         </div>
       </section>
     </main>
@@ -205,6 +254,58 @@ async function onSave(): Promise<void> {
             </button>
             <button type="submit" class="btn-primary" :disabled="saving">
               {{ saving ? "保存中…" : "保存" }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 修改密码弹窗 -->
+    <div v-if="pwdVisible" class="fixed inset-0 z-50 flex items-center justify-center px-6">
+      <div
+        class="absolute inset-0 bg-ink/30 backdrop-blur-[2px]"
+        @click="closeChangePwd"
+      />
+      <div class="relative w-full max-w-md border border-line bg-paper px-8 py-8 shadow-xl">
+        <p class="micro-label">Security</p>
+        <h2 class="mt-3 font-display text-3xl font-medium text-ink">修改密码</h2>
+        <p class="mt-2 text-[13px] leading-relaxed text-mist">
+          修改成功后所有会话将失效，需使用新密码重新登录。
+        </p>
+        <form class="mt-6 space-y-5" @submit.prevent="onSubmitPassword">
+          <div>
+            <label class="micro-label mb-1 block" for="pwd-new">新密码 New password</label>
+            <input
+              id="pwd-new"
+              v-model="pwdForm.password"
+              class="field-input"
+              type="password"
+              minlength="6"
+              autocomplete="new-password"
+              placeholder="至少 6 位"
+              required
+            />
+          </div>
+          <div>
+            <label class="micro-label mb-1 block" for="pwd-confirm">确认新密码 Confirm</label>
+            <input
+              id="pwd-confirm"
+              v-model="pwdForm.confirmPassword"
+              class="field-input"
+              type="password"
+              minlength="6"
+              autocomplete="new-password"
+              placeholder="再次输入新密码"
+              required
+            />
+          </div>
+          <p v-if="pwdError" class="text-[13px] text-red-700">{{ pwdError }}</p>
+          <div class="flex items-center justify-end gap-6 pt-2">
+            <button type="button" class="btn-ghost" :disabled="changingPwd" @click="closeChangePwd">
+              取消
+            </button>
+            <button type="submit" class="btn-primary" :disabled="changingPwd">
+              {{ changingPwd ? "提交中…" : "确认修改" }}
             </button>
           </div>
         </form>

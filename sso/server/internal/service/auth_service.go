@@ -8,7 +8,6 @@ import (
 
 	"mh-sso-svc/internal/cache"
 	"mh-sso-svc/internal/consts"
-	"mh-sso-svc/internal/model"
 	"mh-sso-svc/internal/model/query"
 	"mh-sso-svc/internal/repository"
 	"mh-sso-svc/internal/utils"
@@ -22,7 +21,7 @@ import (
 const dummyHash = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy"
 
 // AuthService SSO 认证核心服务编排层。
-// 仅负责用例编排（Register/Login/Refresh/Logout/ChangePassword/Me/RevokeUserSessions）与错误翻译；
+// 仅负责用例编排（Login/Refresh/Logout/ChangePassword/Me/UpdateProfile/RevokeUserSessions）与错误翻译；
 // 会话/令牌生命周期委托给 SessionService，token 校验委托给 TokenService，审计写入委托给 AuditRepository。
 type AuthService struct {
 	q          *query.Query
@@ -59,70 +58,6 @@ func (s *AuthService) refreshTTL() time.Duration {
 
 func (s *AuthService) sessionTTL() time.Duration {
 	return time.Duration(s.cfg.SessionTTLSecond) * time.Second
-}
-
-// ---------- 注册 ----------
-
-// Register 注册新用户（注册后不自动登录）
-func (s *AuthService) Register(req RegisterRequest) (*RegisterResult, error) {
-	if req.Password != req.ConfirmPassword {
-		return nil, utils.NewBizError(utils.CodeBadRequest, "两次输入的密码不一致")
-	}
-
-	// 唯一性预检查（username 必查；email/mobile 非空时查询）
-	type uniqueCheck struct {
-		field  string // 内部字段名，用于日志检索
-		label  string // 用户可读字段名，用于提示文案
-		value  string
-		exists func(string) (bool, error)
-	}
-	for _, check := range []uniqueCheck{
-		{"username", "用户名", req.Username, s.userRepo.ExistsByAccount},
-		{"email", "邮箱", req.Email, s.userRepo.ExistsByEmail},
-		{"mobile", "手机号", req.Mobile, s.userRepo.ExistsByPhone},
-	} {
-		if check.value == "" {
-			continue
-		}
-		exists, err := check.exists(check.value)
-		if err != nil {
-			return nil, fmt.Errorf("注册唯一性校验失败(field=%s): %w", check.field, err)
-		}
-		if exists {
-			return nil, utils.NewBizError(utils.CodeConflict, "用户已存在")
-		}
-	}
-
-	passwordHash, err := utils.HashPassword(req.Password)
-	if err != nil {
-		return nil, fmt.Errorf("注册密码加密失败: %w", err)
-	}
-
-	user := &model.SysUser{
-		Account:         req.Username,
-		Password:        passwordHash,
-		Name:            req.Nickname,
-		Email:           utils.EmptyToNil(req.Email),
-		Phone:           utils.EmptyToNil(req.Mobile),
-		PasswordVersion: 1,
-	}
-	if user.Name == "" {
-		user.Name = req.Username
-	}
-	if err := s.userRepo.Create(user); err != nil {
-		// 唯一索引兜底：并发注册同一账号时返回 409
-		if repository.IsDuplicateEntryError(err) {
-			return nil, utils.NewBizError(utils.CodeConflict, "用户已存在")
-		}
-		return nil, fmt.Errorf("创建用户失败(account=%s): %w", user.Account, err)
-	}
-
-	s.log.Info("用户注册成功", zap.Uint64("user_id", user.ID), zap.String("username", user.Account))
-	return &RegisterResult{
-		UserID:   user.ID,
-		Username: user.Account,
-		Status:   "active",
-	}, nil
 }
 
 // ---------- 登录 ----------

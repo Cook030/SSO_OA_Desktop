@@ -74,7 +74,7 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
   try {
     return await rawRequest<T>(path, init);
   } catch (err) {
-    const isAuthEndpoint = path === "/login" || path === "/register" || path === "/refresh";
+    const isAuthEndpoint = path === "/login" || path === "/refresh";
     if (err instanceof ApiError && err.code === 401 && !isAuthEndpoint && (await tryRefresh())) {
       return rawRequest<T>(path, init);
     }

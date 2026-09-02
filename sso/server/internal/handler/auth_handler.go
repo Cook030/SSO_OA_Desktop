@@ -24,17 +24,6 @@ func NewAuthHandler(svc *service.AuthService, cfg *utils.AuthConfig) *AuthHandle
 	return &AuthHandler{svc: svc, cfg: cfg}
 }
 
-// Register 注册新用户
-func (h *AuthHandler) Register(c *gin.Context) {
-	var req service.RegisterRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		utils.BadRequest(c, fmt.Sprintf("参数解析失败: %v", err))
-		return
-	}
-	result, err := h.svc.Register(req)
-	h.writeResult(c, result, err)
-}
-
 // Login 登录（成功写入 HttpOnly Cookie）
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req service.LoginRequest

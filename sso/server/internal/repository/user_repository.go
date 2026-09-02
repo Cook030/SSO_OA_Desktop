@@ -67,21 +67,6 @@ func (r *UserRepository) UpdateProfile(id uint64, name string, email, phone *str
 	return err
 }
 
-// ExistsByAccount 登录账号是否已存在
-func (r *UserRepository) ExistsByAccount(account string) (bool, error) {
-	return r.existsBy(r.q.SysUser.Account.Eq(account))
-}
-
-// ExistsByEmail 邮箱是否已存在
-func (r *UserRepository) ExistsByEmail(email string) (bool, error) {
-	return r.existsBy(r.q.SysUser.Email.Eq(email))
-}
-
-// ExistsByPhone 手机号是否已存在
-func (r *UserRepository) ExistsByPhone(phone string) (bool, error) {
-	return r.existsBy(r.q.SysUser.Phone.Eq(phone))
-}
-
 // ExistsByEmailExclude 邮箱是否已被其他用户占用（排除自身，用于资料更新）
 func (r *UserRepository) ExistsByEmailExclude(email string, excludeID uint64) (bool, error) {
 	count, err := r.q.SysUser.

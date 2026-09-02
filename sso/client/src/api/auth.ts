@@ -23,26 +23,11 @@ export interface LoginResult {
   user: UserInfo;
 }
 
-export interface RegisterResult {
-  userId: number;
-  username: string;
-  status: string;
-}
-
 export interface MeResult {
   user: UserInfo;
   groups: { code: string; name: string }[];
   roles: { code: string; name: string }[];
   apps: string[];
-}
-
-export interface RegisterPayload {
-  username: string;
-  password: string;
-  confirmPassword: string;
-  email?: string;
-  mobile?: string;
-  nickname?: string;
 }
 
 export async function login(account: string, password: string): Promise<LoginResult> {
@@ -54,8 +39,14 @@ export async function login(account: string, password: string): Promise<LoginRes
   return data;
 }
 
-export async function register(payload: RegisterPayload): Promise<RegisterResult> {
-  return request<RegisterResult>("/register", {
+export interface ChangePasswordPayload {
+  password: string;
+  confirmPassword: string;
+}
+
+/** 修改密码（成功后服务端会撤销全部会话并清除 Cookie，需重新登录） */
+export async function changePassword(payload: ChangePasswordPayload): Promise<void> {
+  await request<null>("/change-password", {
     method: "POST",
     body: JSON.stringify(payload),
   });

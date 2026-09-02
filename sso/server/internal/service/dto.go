@@ -14,16 +14,6 @@ type RequestMeta struct {
 	RequestID string
 }
 
-// RegisterRequest 注册请求
-type RegisterRequest struct {
-	Username        string `json:"username" binding:"required"`
-	Password        string `json:"password" binding:"required"`
-	ConfirmPassword string `json:"confirmPassword" binding:"required"`
-	Email           string `json:"email" binding:"omitempty,email"`
-	Mobile          string `json:"mobile" binding:"omitempty,min=5,max=32"`
-	Nickname        string `json:"nickname"`
-}
-
 // LoginRequest 登录请求
 type LoginRequest struct {
 	Account  string `json:"account" binding:"required"`
@@ -66,13 +56,6 @@ type UserInfo struct {
 type PermItem struct {
 	Code string `json:"code"`
 	Name string `json:"name"`
-}
-
-// RegisterResult 注册响应
-type RegisterResult struct {
-	UserID   uint64 `json:"userId"`
-	Username string `json:"username"`
-	Status   string `json:"status"`
 }
 
 // LoginResult 登录响应

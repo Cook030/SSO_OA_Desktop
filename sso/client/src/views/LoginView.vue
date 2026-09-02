@@ -45,6 +45,13 @@ async function onSubmit(): Promise<void> {
       One quiet account for every MapleHaze workspace.
     </p>
 
+    <p
+      v-if="route.query.changed"
+      class="mt-6 border border-pine/40 bg-pine/10 px-4 py-3 text-[13px] text-pine"
+    >
+      密码修改成功，请使用新密码重新登录
+    </p>
+
     <form class="mt-10 space-y-7" novalidate @submit.prevent="onSubmit">
       <TextField
         v-model="form.account"
@@ -75,12 +82,7 @@ async function onSubmit(): Promise<void> {
     </form>
 
     <div class="hairline mt-10 pt-5">
-      <p class="text-[13px] text-mist">
-        还没有账号？
-        <RouterLink to="/register" class="text-ink underline-offset-4 hover:underline">
-          创建账户
-        </RouterLink>
-      </p>
+      <p class="text-[13px] text-mist">账号由企业管理员统一创建，如需开通请联系管理员。</p>
     </div>
   </AuthShell>
 </template>
