@@ -1,0 +1,19 @@
+app:
+  name: 智工工作台
+  mode: standalone
+
+auth:
+  provider: local
+  # 后续 OA 接入时切换为 oa，并补充 OA 可信身份验证参数。
+
+executors:
+  default_alias: local-agent
+
+oa:
+  # 当前 OA 后端地址。
+  base_url: http://127.0.0.1:8080
+  # Token 不写入 YAML；工作台从该环境变量读取管理员 SSO access token。
+  access_token_env: OA_ACCESS_TOKEN
+  cookie_name: mh_sso2_access_token
+  # dry-run 只查询并展示将执行的授权；execute 才会真实调用 OA 批量授权接口。
+  mode: dry-run

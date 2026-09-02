@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -17,18 +19,40 @@ import (
 )
 
 func main() {
-	// 1. 加载配置（运行时工作目录即项目根，支持 ${ENV} 环境变量占位符）
-	cfg, err := utils.LoadConfig("config/config.yaml")
+	// 0. 定位配置文件：优先 -config 参数，其次环境变量 CONFIG_FILE，
+	//    否则从当前工作目录逐级向上自动查找 config/config.yaml，
+	//    因此可以在项目内任意子目录（如 cmd/server）直接 go run main.go 启动。
+	configFlag := flag.String("config", "", "配置文件路径（默认自动向上查找 config/config.yaml）")
+	flag.Parse()
+
+	cfgPath := *configFlag
+	if cfgPath == "" {
+		cfgPath = os.Getenv("CONFIG_FILE")
+	}
+	if cfgPath == "" {
+		var err error
+		cfgPath, err = locateConfig("config/config.yaml")
+		if err != nil {
+			fmt.Printf("加载配置失败: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
+	// 1. 加载配置（支持 ${ENV} 环境变量占位符）
+	cfg, err := utils.LoadConfig(cfgPath)
 	if err != nil {
 		fmt.Printf("加载配置失败: %v\n", err)
 		os.Exit(1)
 	}
 
-	// 2. 初始化日志
+	// 2. 初始化日志；相对日志路径基于配置文件所在目录解析，保证从任意目录启动时日志落点一致
+	if cfg.Log.Path != "" && !filepath.IsAbs(cfg.Log.Path) {
+		cfg.Log.Path = filepath.Join(filepath.Dir(cfgPath), cfg.Log.Path)
+	}
 	utils.InitLogger(cfg.Server.Mode, &cfg.Log)
 	log := utils.GetLogger()
 
-	log.Info("配置加载完成")
+	log.Info("配置加载完成", zap.String("config", cfgPath))
 
 	// 3. 校验关键安全配置，缺失时拒绝启动
 	validateAuthConfig(&cfg.Auth, log)
@@ -72,6 +96,28 @@ func main() {
 	_ = rdb.Close()
 	closeDB()
 	log.Info("服务器已安全退出")
+}
+
+// locateConfig 从当前工作目录向上逐级查找目标配置文件，
+// 使服务可在项目内任意子目录（如 cmd/server）直接启动。
+func locateConfig(name string) (string, error) {
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("获取工作目录失败: %w", err)
+	}
+	start := dir
+	for {
+		candidate := filepath.Join(dir, name)
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+			return candidate, nil
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	return "", fmt.Errorf("在 %s 及其上级目录中未找到 %s；请用 -config 指定或设置环境变量 CONFIG_FILE", start, name)
 }
 
 // validateAuthConfig 校验认证相关关键配置，缺失时拒绝启动
