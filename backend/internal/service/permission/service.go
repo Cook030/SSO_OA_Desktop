@@ -15,9 +15,7 @@ import (
 	"permission-system/internal/service/shared"
 )
 
-// Service 权限点管理服务。
-// 读方法直接转发 repository；写方法（Tx 后缀）为原子操作，
-// 不自行开启事务，由 Handler 用例层统一编排。
+// Service 权限点管理服务
 type Service struct {
 	permRepo *repository.PermissionRepository
 	enforcer rbac.Enforcer

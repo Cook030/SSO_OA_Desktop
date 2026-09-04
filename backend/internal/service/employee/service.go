@@ -18,9 +18,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// Service 员工管理服务。
-// 读方法直接转发 repository；写方法（Tx 后缀）为原子操作，
-// 只做领域校验与单实体数据变更，不自行开启事务。
+// Service 员工管理服务
 type Service struct {
 	userRepo     *repository.UserRepository
 	userRoleRepo *repository.UserRoleRepository
@@ -260,8 +258,7 @@ func (s *Service) DeleteUserTx(tx *query.Query, id int64) error {
 	return nil
 }
 
-// ResetPassword 重置员工密码为默认密码，递增密码版本并撤销该员工在 SSO 上的全部会话。
-// 涉及外部系统补偿，作为独立用例保留在本服务（非事务操作，沿用原语义）。
+// ResetPassword 重置员工密码为默认密码，递增密码版本并撤销该员工在 SSO 上的全部会话
 func (s *Service) ResetPassword(employeeID int64) error {
 	user, err := s.userRepo.FindByID(employeeID)
 	if err != nil {

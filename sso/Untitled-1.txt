@@ -1,0 +1,15 @@
+sso（业务写库，行内打点 updated_by/request_id）
+    │ MySQL binlog（ROW + binlog_row_image=FULL）
+    ▼
+Canal Server（deployer，多 instance 伪装从库）
+    │ 表过滤（只留被审计 8 表，黑名单 sys_audit_log）
+    ▼ flat JSON 序列化
+Kafka topic: mh.audit.binlog
+    ▼ 消费组
+audit-consumer（新 Go 服务，本方案的核心交付物）
+    │ 解析 → 脱敏 → 映射 → 幂等去重
+    ▼
+sys_audit_log（同实例审计库）
+
+另一条并存的直写通道：
+sso 在"删除/登录/失败"等关键动作处 → 应用直写 sys_audit_log

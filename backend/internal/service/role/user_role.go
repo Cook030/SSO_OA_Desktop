@@ -12,9 +12,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// UserRoleService 用户-角色归属服务。
-// 写方法均为原子操作（Tx 后缀，不自行开启事务），由 Handler 用例层统一编排事务；
-// 跨域用例（如员工创建）复用 Tx 方法编排进自己的事务。
+// UserRoleService 用户-角色归属服务
 type UserRoleService struct {
 	userRoleRepo *repository.UserRoleRepository
 	enforcer     rbac.Enforcer

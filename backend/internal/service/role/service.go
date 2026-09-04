@@ -16,9 +16,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// Service 角色管理服务。
-// 读方法直接转发 repository；写方法（Tx 后缀）为原子操作，
-// 只做领域校验与数据变更，不自行开启事务，由 Handler 用例层统一编排事务。
+// Service 角色管理服务
 type Service struct {
 	roleRepo     *repository.RoleRepository
 	rolePermRepo *repository.RolePermissionRepository
