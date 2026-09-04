@@ -6,3 +6,14 @@ import "fmt"
 func FormatEmployeeDisplayID(id int64) string {
 	return fmt.Sprintf("%04d", id)
 }
+
+// TimeLayout 统一的时间输出格式
+const TimeLayout = "2006-01-02 15:04:05"
+
+// DerefString 解引用字符串指针，nil 时返回空串
+func DerefString(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}

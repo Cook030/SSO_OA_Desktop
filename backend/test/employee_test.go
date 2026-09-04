@@ -55,7 +55,7 @@ func TestEmployeeBusiness(t *testing.T) {
 		"emailPrefix": newEmailPrefix,
 		"account":     newAccount,
 		"department":  "测试部",
-		"platformIds": []int64{},
+		"roleIds":     []int64{},
 	}).Expect()
 	obj = testutil.MustOK(resp)
 	data := obj.Value("data").Object()
@@ -163,7 +163,7 @@ func TestEmployeeBusiness(t *testing.T) {
 		"emailPrefix": testutil.RandomEmailPrefix(),
 		"account":     testutil.RandomAccount(),
 		"department":  "测试部",
-		"platformIds": []int64{},
+		"roleIds":     []int64{},
 	}).Expect()
 	testutil.MustCode(resp, 400)
 
@@ -174,7 +174,7 @@ func TestEmployeeBusiness(t *testing.T) {
 		"emailPrefix": testutil.RandomEmailPrefix(),
 		"account":     testutil.RandomAccount(),
 		"department":  "测试部",
-		"platformIds": []int64{},
+		"roleIds":     []int64{},
 	}).Expect()
 	testutil.MustMessageContains(testutil.MustCode(resp, 400), "不存在")
 

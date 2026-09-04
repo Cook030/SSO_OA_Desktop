@@ -9,9 +9,9 @@ import (
 	"syscall"
 	"time"
 
-	"permission-system/internal/db_model"
 	"permission-system/internal/db_model/query"
 	"permission-system/internal/router"
+	"permission-system/internal/service/bootstrap"
 	"permission-system/internal/utils"
 
 	_ "permission-system/docs"
@@ -62,8 +62,10 @@ func main() {
 	}
 	log.Info("数据库连接成功")
 
-	// 4. 初始化管理员账号
-	initAdmin(query.Use(db), &cfg.Admin, log)
+	// 4. 初始化 RBAC 基础数据（内置角色、权限点、管理员账号）
+	if err := bootstrap.InitRBAC(query.Use(db), &cfg.Admin); err != nil {
+		log.Fatal("初始化 RBAC 数据失败", zap.Error(err))
+	}
 
 	// 5. 设置路由（Repository/Service/Handler 在路由层内部组装）
 	r := router.SetupRouter(db, cfg)
@@ -93,38 +95,4 @@ func main() {
 	}
 	closeDB()
 	log.Info("服务器已安全退出")
-}
-
-// initAdmin 初始化管理员账号
-func initAdmin(q *query.Query, adminCfg *utils.AdminConfig, log *zap.Logger) {
-	count, err := q.SysUser.Where(q.SysUser.Role.Eq("admin")).Count()
-	if err != nil {
-		log.Fatal("查询管理员账号失败", zap.Error(err))
-	}
-	if count > 0 {
-		log.Info("管理员账号已存在，跳过初始化")
-		return
-	}
-
-	hashedPassword, err := utils.HashPassword(adminCfg.Password)
-	if err != nil {
-		log.Fatal("管理员密码加密失败", zap.Error(err))
-	}
-
-	admin := &db_model.SysUser{
-		Account:  adminCfg.Account,
-		Password: hashedPassword,
-		Name:     adminCfg.Name,
-		Phone:    adminCfg.Phone,
-		Email:    adminCfg.Email,
-		Role:     "admin",
-	}
-
-	if err := q.SysUser.Create(admin); err != nil {
-		log.Fatal("创建管理员账号失败", zap.Error(err))
-	}
-
-	log.Info("管理员账号初始化完成",
-		zap.String("account", adminCfg.Account),
-		zap.String("password", adminCfg.Password))
 }

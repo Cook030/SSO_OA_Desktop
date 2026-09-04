@@ -5,26 +5,31 @@ import (
 
 	"permission-system/internal/api_model/request"
 	"permission-system/internal/api_model/response"
+	"permission-system/internal/db_model"
 	"permission-system/internal/db_model/query"
-	"permission-system/internal/service"
+	"permission-system/internal/middleware"
+	"permission-system/internal/service/permission"
+	"permission-system/internal/service/platform"
 	"permission-system/internal/utils"
 
 	"github.com/gin-gonic/gin"
 )
 
 // PlatformHandler 平台管理处理器
+//
+// 职责：解析请求 -> 编排用例（写用例在事务内调用 service 原子方法）-> 组装响应。
 type PlatformHandler struct {
-	platformService   *service.PlatformService
-	permissionService *service.PermissionService
-	q                 *query.Query // 用于跨 service 事务
+	platformService *platform.Service
+	accessService   *permission.AccessService
+	q               *query.Query // 用例层事务控制
 }
 
 // NewPlatformHandler 创建平台管理处理器
-func NewPlatformHandler(platformService *service.PlatformService, permissionService *service.PermissionService, q *query.Query) *PlatformHandler {
+func NewPlatformHandler(platformService *platform.Service, accessService *permission.AccessService, q *query.Query) *PlatformHandler {
 	return &PlatformHandler{
-		platformService:   platformService,
-		permissionService: permissionService,
-		q:                 q,
+		platformService: platformService,
+		accessService:   accessService,
+		q:               q,
 	}
 }
 
@@ -51,31 +56,29 @@ func (h *PlatformHandler) List(c *gin.Context) {
 		pageSize = 20
 	}
 
-	// 查询平台列表
+	// 用例编排：平台分页 + 批量授权人数统计，组装响应
 	platforms, total, err := h.platformService.FindPlatforms(page, pageSize)
 	if err != nil {
 		utils.ServerError(c, "查询平台列表失败")
 		return
 	}
 
-	// 收集平台ID，批量查询授权人数
 	platformIDs := make([]int64, len(platforms))
 	for i, p := range platforms {
 		platformIDs[i] = p.ID
 	}
-	countMap, err := h.permissionService.CountByPlatformIDs(platformIDs)
+	countMap, err := h.accessService.CountByPlatformIDs(platformIDs)
 	if err != nil {
 		utils.ServerError(c, "查询平台授权人数失败")
 		return
 	}
 
-	// 组装 response
 	list := make([]response.PlatformListItemDTO, len(platforms))
 	for i, p := range platforms {
 		list[i] = response.PlatformListItemDTO{
 			ID:              p.ID,
 			Name:            p.Name,
-			Link:            p.Link,
+			Code:            p.Code,
 			PermissionCount: countMap[p.ID],
 			CreateTime:      p.CreateTime,
 		}
@@ -98,7 +101,6 @@ func (h *PlatformHandler) List(c *gin.Context) {
 //	@Param			request	body		request.PlatformRequest	true	"平台信息"
 //	@Success		200		{object}	utils.Response{data=response.PlatformDTO}
 //	@Failure		400		{object}	utils.Response
-//	@Failure		401		{object}	utils.Response
 //	@Router			/platforms [post]
 func (h *PlatformHandler) Create(c *gin.Context) {
 	var req request.PlatformRequest
@@ -107,16 +109,23 @@ func (h *PlatformHandler) Create(c *gin.Context) {
 		return
 	}
 
-	platform, err := h.platformService.Create(req.Name, req.Link)
-	if err != nil {
+	operatorID := middleware.CurrentUserID(c)
+	requestID := middleware.GetRequestID(c)
+
+	var created *db_model.SysPlatform
+	if err := h.q.Transaction(func(tx *query.Query) error {
+		var err error
+		created, err = h.platformService.CreateTx(tx, req.Name, req.Code, operatorID, requestID)
+		return err
+	}); err != nil {
 		utils.Fail(c, err.Error())
 		return
 	}
 
 	utils.OKWithMsg(c, "平台创建成功", response.PlatformDTO{
-		ID:   platform.ID,
-		Name: platform.Name,
-		Link: platform.Link,
+		ID:   created.ID,
+		Name: created.Name,
+		Code: created.Code,
 	})
 }
 
@@ -132,7 +141,6 @@ func (h *PlatformHandler) Create(c *gin.Context) {
 //	@Param			request	body		request.PlatformRequest		true	"平台信息"
 //	@Success		200		{object}	utils.Response{data=response.PlatformDTO}
 //	@Failure		400		{object}	utils.Response
-//	@Failure		401		{object}	utils.Response
 //	@Router			/platforms/{id} [put]
 func (h *PlatformHandler) Update(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -147,16 +155,23 @@ func (h *PlatformHandler) Update(c *gin.Context) {
 		return
 	}
 
-	platform, err := h.platformService.Update(id, req.Name, req.Link)
-	if err != nil {
+	operatorID := middleware.CurrentUserID(c)
+	requestID := middleware.GetRequestID(c)
+
+	var updated *db_model.SysPlatform
+	if err := h.q.Transaction(func(tx *query.Query) error {
+		var err error
+		updated, err = h.platformService.UpdateTx(tx, id, req.Name, req.Code, operatorID, requestID)
+		return err
+	}); err != nil {
 		utils.Fail(c, err.Error())
 		return
 	}
 
 	utils.OKWithMsg(c, "平台更新成功", response.PlatformDTO{
-		ID:   platform.ID,
-		Name: platform.Name,
-		Link: platform.Link,
+		ID:   updated.ID,
+		Name: updated.Name,
+		Code: updated.Code,
 	})
 }
 
@@ -171,7 +186,6 @@ func (h *PlatformHandler) Update(c *gin.Context) {
 //	@Param			id	path		int	true	"平台ID"
 //	@Success		200	{object}	utils.Response
 //	@Failure		400	{object}	utils.Response
-//	@Failure		401	{object}	utils.Response
 //	@Router			/platforms/{id} [delete]
 func (h *PlatformHandler) Delete(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -180,14 +194,9 @@ func (h *PlatformHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	// 跨 Service 事务：删除平台及其关联权限
-	err = h.q.Transaction(func(tx *query.Query) error {
-		if err := h.permissionService.DeleteByPlatformID(tx, id); err != nil {
-			return err
-		}
-		return h.platformService.Delete(tx, id)
-	})
-	if err != nil {
+	if err := h.q.Transaction(func(tx *query.Query) error {
+		return h.platformService.DeleteTx(tx, id)
+	}); err != nil {
 		utils.Fail(c, err.Error())
 		return
 	}

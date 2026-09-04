@@ -29,7 +29,10 @@ func newSysPlatform(db *gorm.DB, opts ...gen.DOOption) sysPlatform {
 	_sysPlatform.ALL = field.NewAsterisk(tableName)
 	_sysPlatform.ID = field.NewInt64(tableName, "id")
 	_sysPlatform.Name = field.NewString(tableName, "name")
-	_sysPlatform.Link = field.NewString(tableName, "link")
+	_sysPlatform.Code = field.NewString(tableName, "code")
+	_sysPlatform.CreatedBy = field.NewInt64(tableName, "created_by")
+	_sysPlatform.UpdatedBy = field.NewInt64(tableName, "updated_by")
+	_sysPlatform.RequestID = field.NewString(tableName, "request_id")
 	_sysPlatform.CreateTime = field.NewTime(tableName, "create_time")
 	_sysPlatform.UpdateTime = field.NewTime(tableName, "update_time")
 
@@ -38,13 +41,17 @@ func newSysPlatform(db *gorm.DB, opts ...gen.DOOption) sysPlatform {
 	return _sysPlatform
 }
 
+// sysPlatform 平台表
 type sysPlatform struct {
 	sysPlatformDo
 
 	ALL        field.Asterisk
 	ID         field.Int64
 	Name       field.String // 平台名称
-	Link       field.String // 平台链接
+	Code       field.String // 平台编码
+	CreatedBy  field.Int64  // 创建操作人ID
+	UpdatedBy  field.Int64  // 最后更新操作人ID
+	RequestID  field.String // 最后一次写操作请求ID
 	CreateTime field.Time
 	UpdateTime field.Time
 
@@ -65,7 +72,10 @@ func (s *sysPlatform) updateTableName(table string) *sysPlatform {
 	s.ALL = field.NewAsterisk(table)
 	s.ID = field.NewInt64(table, "id")
 	s.Name = field.NewString(table, "name")
-	s.Link = field.NewString(table, "link")
+	s.Code = field.NewString(table, "code")
+	s.CreatedBy = field.NewInt64(table, "created_by")
+	s.UpdatedBy = field.NewInt64(table, "updated_by")
+	s.RequestID = field.NewString(table, "request_id")
 	s.CreateTime = field.NewTime(table, "create_time")
 	s.UpdateTime = field.NewTime(table, "update_time")
 
@@ -84,10 +94,13 @@ func (s *sysPlatform) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (s *sysPlatform) fillFieldMap() {
-	s.fieldMap = make(map[string]field.Expr, 5)
+	s.fieldMap = make(map[string]field.Expr, 8)
 	s.fieldMap["id"] = s.ID
 	s.fieldMap["name"] = s.Name
-	s.fieldMap["link"] = s.Link
+	s.fieldMap["code"] = s.Code
+	s.fieldMap["created_by"] = s.CreatedBy
+	s.fieldMap["updated_by"] = s.UpdatedBy
+	s.fieldMap["request_id"] = s.RequestID
 	s.fieldMap["create_time"] = s.CreateTime
 	s.fieldMap["update_time"] = s.UpdateTime
 }

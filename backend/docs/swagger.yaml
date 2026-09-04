@@ -1,19 +1,15 @@
 basePath: /api
 definitions:
-  request.BatchDeleteRequest:
+  request.AssignPermissionsRequest:
     properties:
-      platformIds:
-        items:
-          type: integer
-        type: array
-      userIds:
+      permissionIds:
         items:
           type: integer
         type: array
     type: object
-  request.BatchSetRequest:
+  request.AssignUsersRequest:
     properties:
-      platformIds:
+      roleIds:
         items:
           type: integer
         type: array
@@ -36,17 +32,48 @@ definitions:
         type: string
       phone:
         type: string
-      platformIds:
+      roleIds:
         items:
           type: integer
         type: array
     type: object
-  request.PlatformRequest:
+  request.CreatePermissionRequest:
     properties:
-      link:
+      code:
         type: string
       name:
         type: string
+      parentId:
+        type: integer
+      platformId:
+        type: integer
+      sort:
+        type: integer
+      type:
+        type: integer
+    type: object
+  request.CreateRoleRequest:
+    properties:
+      code:
+        type: string
+      description:
+        type: string
+      name:
+        type: string
+    type: object
+  request.PlatformRequest:
+    properties:
+      code:
+        type: string
+      name:
+        type: string
+    type: object
+  request.SetUserRolesRequest:
+    properties:
+      roleIds:
+        items:
+          type: integer
+        type: array
     type: object
   request.UpdateEmployeeRequest:
     properties:
@@ -60,12 +87,21 @@ definitions:
         type: string
       phone:
         type: string
-      platformIds:
+      roleIds:
         items:
           type: integer
         type: array
     type: object
-  response.BatchPermissionResultDTO:
+  request.UpdateRoleRequest:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+      status:
+        type: integer
+    type: object
+  response.BatchAssignResultDTO:
     properties:
       affectedCount:
         type: integer
@@ -103,6 +139,10 @@ definitions:
         items:
           $ref: '#/definitions/response.PlatformPermission'
         type: array
+      roles:
+        items:
+          $ref: '#/definitions/response.RoleOptionDTO'
+        type: array
     type: object
   response.EmployeePageResult:
     properties:
@@ -113,23 +153,65 @@ definitions:
       total:
         type: integer
     type: object
-  response.PlatformDTO:
+  response.MePermissionDTO:
     properties:
+      isAdmin:
+        type: boolean
+      permissions:
+        items:
+          type: string
+        type: array
+      platforms:
+        items:
+          $ref: '#/definitions/response.PlatformPermission'
+        type: array
+      roles:
+        items:
+          type: string
+        type: array
+      userId:
+        type: integer
+    type: object
+  response.PermissionNode:
+    properties:
+      children:
+        items:
+          $ref: '#/definitions/response.PermissionNode'
+        type: array
+      code:
+        type: string
       id:
         type: integer
-      link:
+      name:
         type: string
+      parentId:
+        type: integer
+      platformId:
+        type: integer
+      sort:
+        type: integer
+      status:
+        type: integer
+      type:
+        type: integer
+    type: object
+  response.PlatformDTO:
+    properties:
+      code:
+        type: string
+      id:
+        type: integer
       name:
         type: string
     type: object
   response.PlatformListItemDTO:
     properties:
+      code:
+        type: string
       createTime:
         type: string
       id:
         type: integer
-      link:
-        type: string
       name:
         type: string
       permissionCount:
@@ -147,6 +229,57 @@ definitions:
   response.PlatformPermission:
     properties:
       id:
+        type: integer
+      name:
+        type: string
+    type: object
+  response.RoleDTO:
+    properties:
+      code:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      isBuiltin:
+        type: integer
+      name:
+        type: string
+      permissions:
+        items:
+          type: integer
+        type: array
+      status:
+        type: integer
+    type: object
+  response.RoleListItemDTO:
+    properties:
+      code:
+        type: string
+      createTime:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      isBuiltin:
+        type: integer
+      name:
+        type: string
+      permissionCount:
+        type: integer
+      status:
+        type: integer
+      userCount:
+        type: integer
+    type: object
+  response.RoleOptionDTO:
+    properties:
+      code:
+        type: string
+      id:
+        type: integer
+      isBuiltin:
         type: integer
       name:
         type: string
@@ -194,7 +327,7 @@ paths:
     get:
       consumes:
       - application/json
-      description: 分页获取员工列表，支持搜索和筛选
+      description: 分页获取员工列表，支持搜索和筛选（默认不包含管理员账号）
       parameters:
       - description: 页码，默认1
         in: query
@@ -232,6 +365,10 @@ paths:
           description: Unauthorized
           schema:
             $ref: '#/definitions/utils.Response'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.Response'
       security:
       - CookieAuth: []
       summary: 获取员工列表
@@ -240,7 +377,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: 创建新的员工账号
+      description: 创建新的员工账号并分配角色（未指定角色时默认赋予普通员工角色）
       parameters:
       - description: 员工信息
         in: body
@@ -268,6 +405,10 @@ paths:
           description: Unauthorized
           schema:
             $ref: '#/definitions/utils.Response'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.Response'
       security:
       - CookieAuth: []
       summary: 创建员工
@@ -277,7 +418,7 @@ paths:
     delete:
       consumes:
       - application/json
-      description: 删除指定员工及其平台权限
+      description: 删除指定员工及其角色绑定
       parameters:
       - description: 员工ID
         in: path
@@ -299,6 +440,10 @@ paths:
           description: Unauthorized
           schema:
             $ref: '#/definitions/utils.Response'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.Response'
       security:
       - CookieAuth: []
       summary: 删除员工
@@ -307,7 +452,7 @@ paths:
     put:
       consumes:
       - application/json
-      description: 更新员工信息和平台权限
+      description: 更新员工信息与角色归属
       parameters:
       - description: 员工ID
         in: path
@@ -340,6 +485,10 @@ paths:
           description: Unauthorized
           schema:
             $ref: '#/definitions/utils.Response'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.Response'
       security:
       - CookieAuth: []
       summary: 更新员工
@@ -349,7 +498,7 @@ paths:
     put:
       consumes:
       - application/json
-      description: 将指定员工的密码重置为默认密码，password_changed 置为 false，员工下次登录需修改密码
+      description: 将指定员工的密码重置为默认密码，密码版本递增使旧 token 失效，员工下次登录需修改密码
       parameters:
       - description: 员工ID
         in: path
@@ -369,6 +518,10 @@ paths:
             $ref: '#/definitions/utils.Response'
         "401":
           description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/utils.Response'
       security:
@@ -399,23 +552,20 @@ paths:
           description: Unauthorized
           schema:
             $ref: '#/definitions/utils.Response'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.Response'
       security:
       - CookieAuth: []
       summary: 获取部门列表
       tags:
       - 员工管理
-  /employees/permissions/batch:
-    delete:
+  /me/permissions:
+    get:
       consumes:
       - application/json
-      description: 为多个用户批量删除指定的平台权限
-      parameters:
-      - description: 权限删除请求
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/request.BatchDeleteRequest'
+      description: 返回当前登录用户的角色、权限编码与可访问平台，供前端做菜单与按钮控制
       produces:
       - application/json
       responses:
@@ -426,32 +576,60 @@ paths:
             - $ref: '#/definitions/utils.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/response.BatchPermissionResultDTO'
+                  $ref: '#/definitions/response.MePermissionDTO'
               type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/utils.Response'
         "401":
           description: Unauthorized
           schema:
             $ref: '#/definitions/utils.Response'
       security:
       - CookieAuth: []
-      summary: 批量删除平台权限
+      summary: 获取当前用户权限
+      tags:
+      - 权限管理
+  /permissions:
+    get:
+      consumes:
+      - application/json
+      description: 按父子关系返回全部权限点，供角色授权时勾选
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/response.PermissionNode'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.Response'
+      security:
+      - CookieAuth: []
+      summary: 获取权限树
       tags:
       - 权限管理
     post:
       consumes:
       - application/json
-      description: 为多个用户批量分配平台权限（增量模式）
+      description: 新增一个权限点（菜单或 API）
       parameters:
-      - description: 权限设置请求
+      - description: 权限点信息
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/request.BatchSetRequest'
+          $ref: '#/definitions/request.CreatePermissionRequest'
       produces:
       - application/json
       responses:
@@ -462,7 +640,7 @@ paths:
             - $ref: '#/definitions/utils.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/response.BatchPermissionResultDTO'
+                  $ref: '#/definitions/response.PermissionNode'
               type: object
         "400":
           description: Bad Request
@@ -472,9 +650,13 @@ paths:
           description: Unauthorized
           schema:
             $ref: '#/definitions/utils.Response'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.Response'
       security:
       - CookieAuth: []
-      summary: 批量设置平台权限
+      summary: 创建权限点
       tags:
       - 权限管理
   /platforms:
@@ -539,10 +721,6 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/utils.Response'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/utils.Response'
       security:
       - CookieAuth: []
       summary: 创建平台
@@ -568,10 +746,6 @@ paths:
             $ref: '#/definitions/utils.Response'
         "400":
           description: Bad Request
-          schema:
-            $ref: '#/definitions/utils.Response'
-        "401":
-          description: Unauthorized
           schema:
             $ref: '#/definitions/utils.Response'
       security:
@@ -611,15 +785,360 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/utils.Response'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/utils.Response'
       security:
       - CookieAuth: []
       summary: 更新平台
       tags:
       - 平台管理
+  /roles:
+    get:
+      consumes:
+      - application/json
+      description: 获取全部角色，并附带动用户数与权限数
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/response.RoleListItemDTO'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.Response'
+      security:
+      - CookieAuth: []
+      summary: 获取角色列表
+      tags:
+      - 角色管理
+    post:
+      consumes:
+      - application/json
+      description: 创建新的自定义角色（内置角色由初始化脚本预置）
+      parameters:
+      - description: 角色信息
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.CreateRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.RoleDTO'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.Response'
+      security:
+      - CookieAuth: []
+      summary: 创建角色
+      tags:
+      - 角色管理
+  /roles/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: 删除指定角色（内置角色、仍有用户绑定的角色不可删除）
+      parameters:
+      - description: 角色ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.Response'
+      security:
+      - CookieAuth: []
+      summary: 删除角色
+      tags:
+      - 角色管理
+    put:
+      consumes:
+      - application/json
+      description: 更新角色名称、描述与状态（内置角色不可停用）
+      parameters:
+      - description: 角色ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 角色信息
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.UpdateRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.RoleDTO'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.Response'
+      security:
+      - CookieAuth: []
+      summary: 更新角色
+      tags:
+      - 角色管理
+  /roles/{id}/permissions:
+    get:
+      consumes:
+      - application/json
+      description: 返回该角色已授权的权限点ID列表
+      parameters:
+      - description: 角色ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  items:
+                    type: integer
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.Response'
+      security:
+      - CookieAuth: []
+      summary: 查询角色持有的权限
+      tags:
+      - 角色管理
+    put:
+      consumes:
+      - application/json
+      description: 全量覆盖角色的权限点授权
+      parameters:
+      - description: 角色ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 权限ID列表
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.AssignPermissionsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.Response'
+      security:
+      - CookieAuth: []
+      summary: 给角色配置权限
+      tags:
+      - 角色管理
+  /roles/users:
+    post:
+      consumes:
+      - application/json
+      description: 为多个用户增量分配指定角色（已存在的不重复插入）
+      parameters:
+      - description: 用户与角色ID
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.AssignUsersRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.BatchAssignResultDTO'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.Response'
+      security:
+      - CookieAuth: []
+      summary: 批量给用户分配角色
+      tags:
+      - 角色管理
+  /users/{id}/roles:
+    get:
+      consumes:
+      - application/json
+      description: 返回指定用户当前的角色列表
+      parameters:
+      - description: 用户ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/response.RoleOptionDTO'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.Response'
+      security:
+      - CookieAuth: []
+      summary: 查询用户持有的角色
+      tags:
+      - 角色管理
+    put:
+      consumes:
+      - application/json
+      description: 全量覆盖指定用户的角色
+      parameters:
+      - description: 用户ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 角色ID列表
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.SetUserRolesRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.Response'
+      security:
+      - CookieAuth: []
+      summary: 设置用户的角色
+      tags:
+      - 角色管理
 schemes:
 - http
 securityDefinitions:

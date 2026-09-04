@@ -37,6 +37,26 @@ func (r *PlatformRepository) Delete(id int64) error {
 	return err
 }
 
+// FindByCode 根据平台编码查找平台
+func (r *PlatformRepository) FindByCode(code string) (*db_model.SysPlatform, error) {
+	return r.q.SysPlatform.Where(r.q.SysPlatform.Code.Eq(code)).First()
+}
+
+// FindAll 查询全部平台（不分页，按ID升序）
+func (r *PlatformRepository) FindAll() ([]*db_model.SysPlatform, error) {
+	return r.q.SysPlatform.Order(r.q.SysPlatform.ID).Find()
+}
+
+// ExistsByCode 检查平台编码是否存在(排除指定ID)
+func (r *PlatformRepository) ExistsByCode(code string, excludeID int64) (bool, error) {
+	p := r.q.SysPlatform.Where(r.q.SysPlatform.Code.Eq(code))
+	if excludeID > 0 {
+		p = p.Where(r.q.SysPlatform.ID.Neq(excludeID))
+	}
+	count, err := p.Count()
+	return count > 0, err
+}
+
 // List 分页查询平台列表
 func (r *PlatformRepository) List(page, pageSize int) ([]*db_model.SysPlatform, int64, error) {
 	offset := (page - 1) * pageSize
@@ -46,16 +66,6 @@ func (r *PlatformRepository) List(page, pageSize int) ([]*db_model.SysPlatform, 
 // ExistsByName 检查平台名称是否存在
 func (r *PlatformRepository) ExistsByName(name string, excludeID int64) (bool, error) {
 	p := r.q.SysPlatform.Where(r.q.SysPlatform.Name.Eq(name))
-	if excludeID > 0 {
-		p = p.Where(r.q.SysPlatform.ID.Neq(excludeID))
-	}
-	count, err := p.Count()
-	return count > 0, err
-}
-
-// ExistsByLink 检查平台链接是否存在
-func (r *PlatformRepository) ExistsByLink(link string, excludeID int64) (bool, error) {
-	p := r.q.SysPlatform.Where(r.q.SysPlatform.Link.Eq(link))
 	if excludeID > 0 {
 		p = p.Where(r.q.SysPlatform.ID.Neq(excludeID))
 	}

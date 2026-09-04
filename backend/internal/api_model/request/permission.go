@@ -1,13 +1,11 @@
 package request
 
-// BatchSetRequest 批量设置权限请求
-type BatchSetRequest struct {
-	UserIDs     []int64 `json:"userIds"`
-	PlatformIDs []int64 `json:"platformIds"`
-}
-
-// BatchDeleteRequest 批量删除权限请求
-type BatchDeleteRequest struct {
-	UserIDs     []int64 `json:"userIds"`
-	PlatformIDs []int64 `json:"platformIds"`
+// CreatePermissionRequest 新增权限点请求
+type CreatePermissionRequest struct {
+	PlatformID int64  `json:"platformId"`
+	Code       string `json:"code"`
+	Name       string `json:"name"`
+	Type       int32  `json:"type"`
+	ParentID   *int64 `json:"parentId"`
+	Sort       int32  `json:"sort"`
 }

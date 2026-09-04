@@ -9,13 +9,18 @@ import (
 	"permission-system/internal/handler"
 	"permission-system/internal/middleware"
 	"permission-system/internal/repository"
-	"permission-system/internal/service"
+	"permission-system/internal/service/employee"
+	"permission-system/internal/service/permission"
+	"permission-system/internal/service/platform"
+	"permission-system/internal/service/rbac"
+	"permission-system/internal/service/role"
 	"permission-system/internal/utils"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
@@ -40,21 +45,34 @@ func SetupRouter(db *gorm.DB, cfg *utils.Config) *gin.Engine {
 	// 创建 gen query，用于类型安全的数据库操作
 	q := query.Use(db)
 
-	// 组装 Repository → Service → Handler
+	// 组装 Repository 层
 	userRepo := repository.NewUserRepository(q)
 	platformRepo := repository.NewPlatformRepository(q)
-	userPlatformRepo := repository.NewUserPlatformRepository(q)
+	permRepo := repository.NewPermissionRepository(q)
+	roleRepo := repository.NewRoleRepository(q)
+	rolePermRepo := repository.NewRolePermissionRepository(q)
+	userRoleRepo := repository.NewUserRoleRepository(q)
 
-	// PermissionService 最先创建（被 Employee/Platform 两个 Service 依赖）
-	permissionService := service.NewPermissionService(q, userPlatformRepo, platformRepo)
+	// Enforcer：策略在内存中缓存，权限变更时由 Service 主动失效
+	enforcer := rbac.NewCachedEnforcer(permRepo, userRoleRepo)
+	if err := enforcer.ReloadPolicy(); err != nil {
+		utils.GetLogger().Error("加载权限策略失败", zap.Error(err))
+	}
 
+	// 组装 Service 层（读方法直接转发 repository；写方法为 Tx 原子操作，事务由 Handler 用例层编排）
 	ssoClient := client.NewSSOClient(cfg.SSO)
-	platformService := service.NewPlatformService(platformRepo)
-	employeeService := service.NewEmployeeService(q, userRepo, ssoClient)
+	permissionService := permission.New(permRepo, enforcer)
+	accessService := permission.NewAccessService(platformRepo, permRepo, rolePermRepo, userRoleRepo, enforcer)
+	platformService := platform.New(platformRepo, enforcer)
+	roleService := role.New(roleRepo, rolePermRepo, userRoleRepo, enforcer)
+	userRoleService := role.NewUserRoleService(userRoleRepo, enforcer)
+	employeeService := employee.New(userRepo, userRoleRepo, enforcer, ssoClient)
 
-	platformHandler := handler.NewPlatformHandler(platformService, permissionService, q)
-	employeeHandler := handler.NewEmployeeHandler(employeeService, permissionService, q)
-	permissionHandler := handler.NewPermissionHandler(permissionService, q)
+	// 组装 Handler 层（Handler 持有 q，负责用例事务编排与响应组装）
+	platformHandler := handler.NewPlatformHandler(platformService, accessService, q)
+	employeeHandler := handler.NewEmployeeHandler(employeeService, accessService, userRoleService, q)
+	roleHandler := handler.NewRoleHandler(roleService, userRoleService, q)
+	permissionHandler := handler.NewPermissionHandler(permissionService, accessService, enforcer, q)
 
 	testGroup := r.Group("/test")
 	{
@@ -75,30 +93,40 @@ func SetupRouter(db *gorm.DB, cfg *utils.Config) *gin.Engine {
 	auth := api.Group("")
 	auth.Use(middleware.AuthMiddleware(ssoClient, userRepo))
 	{
-		// 需要管理员权限的接口
-		admin := auth.Group("")
-		admin.Use(middleware.AdminMiddleware())
-		{
-			// 平台管理
-			admin.GET("/platforms", platformHandler.List)
-			admin.POST("/platforms", platformHandler.Create)
-			admin.PUT("/platforms/:id", platformHandler.Update)
-			admin.DELETE("/platforms/:id", platformHandler.Delete)
+		// 当前用户权限视图（所有登录用户均可访问）
+		auth.GET("/me/permissions", permissionHandler.Me)
 
-			// 员工管理
-			admin.GET("/employees", employeeHandler.List)
-			admin.GET("/employees/departments", employeeHandler.GetDepartments)
-			admin.POST("/employees", employeeHandler.Create)
-			admin.PUT("/employees/:id", employeeHandler.Update)
-			admin.DELETE("/employees/:id", employeeHandler.Delete)
+		// 平台管理
+		auth.GET("/platforms", middleware.RequirePermission(enforcer, "platform", "list"), platformHandler.List)
+		auth.POST("/platforms", middleware.RequirePermission(enforcer, "platform", "create"), platformHandler.Create)
+		auth.PUT("/platforms/:id", middleware.RequirePermission(enforcer, "platform", "update"), platformHandler.Update)
+		auth.DELETE("/platforms/:id", middleware.RequirePermission(enforcer, "platform", "delete"), platformHandler.Delete)
 
-			// 重置员工密码(管理员)
-			admin.PUT("/employees/:id/reset-password", employeeHandler.ResetPassword)
+		// 员工管理
+		auth.GET("/employees", middleware.RequirePermission(enforcer, "employee", "list"), employeeHandler.List)
+		auth.GET("/employees/departments", middleware.RequirePermission(enforcer, "employee", "list"), employeeHandler.GetDepartments)
+		auth.POST("/employees", middleware.RequirePermission(enforcer, "employee", "create"), employeeHandler.Create)
+		auth.PUT("/employees/:id", middleware.RequirePermission(enforcer, "employee", "update"), employeeHandler.Update)
+		auth.DELETE("/employees/:id", middleware.RequirePermission(enforcer, "employee", "delete"), employeeHandler.Delete)
+		auth.PUT("/employees/:id/reset-password",
+			middleware.RequirePermission(enforcer, "employee", "reset-password"), employeeHandler.ResetPassword)
 
-			// 权限管理
-			admin.POST("/employees/permissions/batch", permissionHandler.BatchSet)
-			admin.DELETE("/employees/permissions/batch", permissionHandler.BatchDelete)
-		}
+		// 角色管理
+		auth.GET("/roles", middleware.RequirePermission(enforcer, "role", "list"), roleHandler.List)
+		auth.POST("/roles", middleware.RequirePermission(enforcer, "role", "create"), roleHandler.Create)
+		auth.PUT("/roles/:id", middleware.RequirePermission(enforcer, "role", "update"), roleHandler.Update)
+		auth.DELETE("/roles/:id", middleware.RequirePermission(enforcer, "role", "delete"), roleHandler.Delete)
+		auth.GET("/roles/:id/permissions", middleware.RequirePermission(enforcer, "role", "list"), roleHandler.GetPermissions)
+		auth.PUT("/roles/:id/permissions", middleware.RequirePermission(enforcer, "role", "assign"), roleHandler.AssignPermissions)
+		auth.POST("/roles/users", middleware.RequirePermission(enforcer, "user", "role:assign"), roleHandler.AssignUsers)
+
+		// 用户-角色
+		auth.GET("/users/:id/roles", middleware.RequirePermission(enforcer, "role", "list"), roleHandler.GetUserRoles)
+		auth.PUT("/users/:id/roles", middleware.RequirePermission(enforcer, "user", "role:assign"), roleHandler.SetUserRoles)
+
+		// 权限点
+		auth.GET("/permissions", middleware.RequirePermission(enforcer, "permission", "list"), permissionHandler.ListTree)
+		auth.POST("/permissions", middleware.RequirePermission(enforcer, "permission", "create"), permissionHandler.Create)
 	}
 
 	return r

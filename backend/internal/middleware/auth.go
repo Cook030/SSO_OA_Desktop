@@ -14,7 +14,28 @@ import (
 	"gorm.io/gorm"
 )
 
-// extractAccessToken 从 mh_sso2_access_token Cookie 中提取 accessToken（与 SSO 接口设计文档一致）。
+// gin.Context 中认证信息的键
+const (
+	// ContextKeyUserID 当前登录用户ID
+	ContextKeyUserID = "userId"
+	// ContextKeyAccount 当前登录账号
+	ContextKeyAccount = "account"
+)
+
+// CurrentUserID 从 gin.Context 读取当前登录用户ID；未认证时为 0
+func CurrentUserID(c *gin.Context) int64 {
+	return c.GetInt64(ContextKeyUserID)
+}
+
+// CurrentAccount 从 gin.Context 读取当前登录账号
+func CurrentAccount(c *gin.Context) string {
+	account, _ := c.Get(ContextKeyAccount)
+	if v, ok := account.(string); ok {
+		return v
+	}
+	return ""
+}
+
 // 后端仅认 Cookie 通道，不再解析 Authorization: Bearer Header。
 // errMsg 为空表示提取成功；否则为缺少认证信息。
 func extractAccessToken(c *gin.Context) (accessToken, errMsg string) {
@@ -111,22 +132,8 @@ func AuthMiddleware(ssoClient *client.SSOClient, userRepo *repository.UserReposi
 		)
 
 		// 将用户信息存入上下文
-		c.Set("userId", user.ID)
-		c.Set("account", user.Account)
-		c.Set("role", user.Role)
-		c.Next()
-	}
-}
-
-// AdminMiddleware 管理员权限中间件
-func AdminMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		role, exists := c.Get("role")
-		if !exists || role != "admin" {
-			utils.Forbidden(c, "无权限访问")
-			c.AbortWithStatus(http.StatusOK)
-			return
-		}
+		c.Set(ContextKeyUserID, user.ID)
+		c.Set(ContextKeyAccount, user.Account)
 		c.Next()
 	}
 }

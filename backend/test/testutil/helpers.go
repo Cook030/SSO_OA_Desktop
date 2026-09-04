@@ -47,9 +47,9 @@ func RandomPlatformName() string {
 	return fmt.Sprintf("平台_%d_%d", time.Now().UnixNano(), rand.Intn(10000))
 }
 
-// RandomPlatformLink 生成随机平台链接
-func RandomPlatformLink() string {
-	return fmt.Sprintf("link_%d_%d", time.Now().UnixNano(), rand.Intn(10000))
+// RandomPlatformCode 生成随机平台编码
+func RandomPlatformCode() string {
+	return fmt.Sprintf("plat_%d_%d", time.Now().UnixNano(), rand.Intn(10000))
 }
 
 // RandomEmployee 生成随机员工姓名、手机号、邮箱前缀、账号
@@ -62,11 +62,11 @@ func RandomEmployee() (name, phone, emailPrefix, account string) {
 // CreatePlatform 创建平台并返回 ID 和清理函数
 func CreatePlatform() (int64, func()) {
 	name := RandomPlatformName()
-	link := RandomPlatformLink()
+	code := RandomPlatformCode()
 
 	resp := E.POST("/platforms").WithJSON(map[string]any{
 		"name": name,
-		"link": link,
+		"code": code,
 	}).Expect()
 
 	data := MustOK(resp).Value("data").Object()
@@ -86,6 +86,7 @@ func DeletePlatform(id int64) {
 // ─── 员工 CRUD ────────────────────────────────────────────────────
 
 // CreateEmployee 创建员工并返回 ID、账号和清理函数
+// 不指定角色时由后端赋予内置 employee 角色
 func CreateEmployee() (int64, string, func()) {
 	name, phone, emailPrefix, account := RandomEmployee()
 
@@ -95,7 +96,7 @@ func CreateEmployee() (int64, string, func()) {
 		"emailPrefix": emailPrefix,
 		"account":     account,
 		"department":  "测试部",
-		"platformIds": []int64{},
+		"roleIds":     []int64{},
 		"password":    "Test@123456",
 	}).Expect()
 
@@ -112,28 +113,4 @@ func DeleteEmployee(id int64) {
 		return
 	}
 	E.DELETE("/employees/{id}").WithPath("id", id).Expect().Status(200)
-}
-
-// ─── 权限操作 ─────────────────────────────────────────────────────
-
-// GrantPermission 批量为员工授予平台权限
-func GrantPermission(userIDs, platformIDs []int64) int64 {
-	resp := E.POST("/employees/permissions/batch").WithJSON(map[string]any{
-		"userIds":     userIDs,
-		"platformIds": platformIDs,
-	}).Expect()
-
-	data := MustOK(resp).Value("data").Object()
-	return int64(data.Value("affectedCount").Number().Raw())
-}
-
-// RemovePermission 批量删除员工的平台权限
-func RemovePermission(userIDs, platformIDs []int64) int64 {
-	resp := E.DELETE("/employees/permissions/batch").WithJSON(map[string]any{
-		"userIds":     userIDs,
-		"platformIds": platformIDs,
-	}).Expect()
-
-	data := MustOK(resp).Value("data").Object()
-	return int64(data.Value("affectedCount").Number().Raw())
 }

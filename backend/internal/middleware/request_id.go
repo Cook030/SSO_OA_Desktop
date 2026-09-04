@@ -42,7 +42,7 @@ func RequestIDMiddleware() gin.HandlerFunc {
 			zap.String("path", c.Request.URL.Path),
 			zap.Int("status", c.Writer.Status()),
 			zap.Int64("latency_ms", time.Since(start).Milliseconds()),
-			zap.Int64("user_id", c.GetInt64("userId")),
+			zap.Int64("user_id", c.GetInt64(ContextKeyUserID)),
 		)
 	}
 }

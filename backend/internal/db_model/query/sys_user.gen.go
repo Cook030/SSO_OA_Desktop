@@ -33,9 +33,11 @@ func newSysUser(db *gorm.DB, opts ...gen.DOOption) sysUser {
 	_sysUser.Name = field.NewString(tableName, "name")
 	_sysUser.Phone = field.NewString(tableName, "phone")
 	_sysUser.Email = field.NewString(tableName, "email")
-	_sysUser.Role = field.NewString(tableName, "role")
 	_sysUser.Department = field.NewString(tableName, "department")
-	_sysUser.PasswordChanged = field.NewBool(tableName, "password_changed")
+	_sysUser.PasswordVersion = field.NewInt32(tableName, "password_version")
+	_sysUser.CreatedBy = field.NewInt64(tableName, "created_by")
+	_sysUser.UpdatedBy = field.NewInt64(tableName, "updated_by")
+	_sysUser.RequestID = field.NewString(tableName, "request_id")
 	_sysUser.CreateTime = field.NewTime(tableName, "create_time")
 	_sysUser.UpdateTime = field.NewTime(tableName, "update_time")
 
@@ -44,19 +46,22 @@ func newSysUser(db *gorm.DB, opts ...gen.DOOption) sysUser {
 	return _sysUser
 }
 
+// sysUser 统一用户表(认证+基础信息,SSO与backend共读)
 type sysUser struct {
 	sysUserDo
 
 	ALL             field.Asterisk
 	ID              field.Int64
 	Account         field.String // 登录账号
-	Password        field.String // 密码(bcrypt加密)
+	Password        field.String // 密码(bcrypt加密,SSO登录校验)
 	Name            field.String // 姓名
 	Phone           field.String // 手机号
 	Email           field.String // 邮箱
-	Role            field.String // 角色: admin/employee
 	Department      field.String // 所属部门
-	PasswordChanged field.Bool   // 是否已修改初始密码
+	PasswordVersion field.Int32  // 密码版本(SSO改密递增,旧token自动失效;>1表示已修改过初始密码)
+	CreatedBy       field.Int64  // 创建操作人ID
+	UpdatedBy       field.Int64  // 最后更新操作人ID
+	RequestID       field.String // 最后一次写操作请求ID
 	CreateTime      field.Time
 	UpdateTime      field.Time
 
@@ -81,8 +86,11 @@ func (s *sysUser) updateTableName(table string) *sysUser {
 	s.Name = field.NewString(table, "name")
 	s.Phone = field.NewString(table, "phone")
 	s.Email = field.NewString(table, "email")
-	s.Role = field.NewString(table, "role")
 	s.Department = field.NewString(table, "department")
+	s.PasswordVersion = field.NewInt32(table, "password_version")
+	s.CreatedBy = field.NewInt64(table, "created_by")
+	s.UpdatedBy = field.NewInt64(table, "updated_by")
+	s.RequestID = field.NewString(table, "request_id")
 	s.CreateTime = field.NewTime(table, "create_time")
 	s.UpdateTime = field.NewTime(table, "update_time")
 
@@ -101,16 +109,18 @@ func (s *sysUser) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (s *sysUser) fillFieldMap() {
-	s.fieldMap = make(map[string]field.Expr, 11)
+	s.fieldMap = make(map[string]field.Expr, 13)
 	s.fieldMap["id"] = s.ID
 	s.fieldMap["account"] = s.Account
 	s.fieldMap["password"] = s.Password
 	s.fieldMap["name"] = s.Name
 	s.fieldMap["phone"] = s.Phone
 	s.fieldMap["email"] = s.Email
-	s.fieldMap["role"] = s.Role
 	s.fieldMap["department"] = s.Department
-	s.fieldMap["password_changed"] = s.PasswordChanged
+	s.fieldMap["password_version"] = s.PasswordVersion
+	s.fieldMap["created_by"] = s.CreatedBy
+	s.fieldMap["updated_by"] = s.UpdatedBy
+	s.fieldMap["request_id"] = s.RequestID
 	s.fieldMap["create_time"] = s.CreateTime
 	s.fieldMap["update_time"] = s.UpdateTime
 }

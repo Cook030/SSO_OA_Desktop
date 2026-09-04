@@ -69,10 +69,54 @@ func ValidatePlatformName(name string) error {
 	return nil
 }
 
-// ValidatePlatformLink 校验平台链接长度
-func ValidatePlatformLink(link string) error {
-	if len(link) < 2 || len(link) > 128 {
-		return errors.New("平台链接长度需在2-128字符之间")
+// ValidatePlatformCode 校验平台编码：小写字母、数字、下划线、短横线，长度2-64
+func ValidatePlatformCode(code string) error {
+	if len(code) < 2 || len(code) > 64 {
+		return errors.New("平台编码长度需在2-64字符之间")
+	}
+	match, _ := regexp.MatchString(`^[a-zA-Z0-9_-]+$`, code)
+	if !match {
+		return errors.New("平台编码只能包含字母、数字、下划线和短横线")
+	}
+	return nil
+}
+
+// ValidateRoleCode 校验角色编码：字母、数字、下划线、短横线，长度2-64
+func ValidateRoleCode(code string) error {
+	if len(code) < 2 || len(code) > 64 {
+		return errors.New("角色编码长度需在2-64字符之间")
+	}
+	match, _ := regexp.MatchString(`^[a-zA-Z0-9_-]+$`, code)
+	if !match {
+		return errors.New("角色编码只能包含字母、数字、下划线和短横线")
+	}
+	return nil
+}
+
+// ValidateRoleName 校验角色名称长度
+func ValidateRoleName(name string) error {
+	if len(name) < 2 || len(name) > 64 {
+		return errors.New("角色名称长度需在2-64字符之间")
+	}
+	return nil
+}
+
+// ValidatePermissionCode 校验权限编码：形如 object:action
+func ValidatePermissionCode(code string) error {
+	if len(code) < 3 || len(code) > 128 {
+		return errors.New("权限编码长度需在3-128字符之间")
+	}
+	match, _ := regexp.MatchString(`^[a-zA-Z0-9_*-]+(:[a-zA-Z0-9_*-]+)+$`, code)
+	if !match {
+		return errors.New("权限编码格式应为 <object>:<action>")
+	}
+	return nil
+}
+
+// ValidatePermissionName 校验权限名称长度
+func ValidatePermissionName(name string) error {
+	if len(name) < 2 || len(name) > 64 {
+		return errors.New("权限名称长度需在2-64字符之间")
 	}
 	return nil
 }

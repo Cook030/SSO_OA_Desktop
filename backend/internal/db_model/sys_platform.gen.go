@@ -13,8 +13,11 @@ const TableNameSysPlatform = "sys_platform"
 // SysPlatform 平台表
 type SysPlatform struct {
 	ID         int64     `gorm:"column:id;primaryKey;autoIncrement:true" json:"id"`
-	Name       string    `gorm:"column:name;not null;comment:平台名称" json:"name"` // 平台名称
-	Link       string    `gorm:"column:link;not null;comment:平台链接" json:"link"` // 平台链接
+	Name       string    `gorm:"column:name;not null;comment:平台名称" json:"name"`           // 平台名称
+	Code       string    `gorm:"column:code;not null;comment:平台编码" json:"code"`           // 平台编码
+	CreatedBy  *int64    `gorm:"column:created_by;comment:创建操作人ID" json:"created_by"`     // 创建操作人ID
+	UpdatedBy  *int64    `gorm:"column:updated_by;comment:最后更新操作人ID" json:"updated_by"`   // 最后更新操作人ID
+	RequestID  *string   `gorm:"column:request_id;comment:最后一次写操作请求ID" json:"request_id"` // 最后一次写操作请求ID
 	CreateTime time.Time `gorm:"column:create_time;not null;default:CURRENT_TIMESTAMP" json:"create_time"`
 	UpdateTime time.Time `gorm:"column:update_time;not null;default:CURRENT_TIMESTAMP" json:"update_time"`
 }

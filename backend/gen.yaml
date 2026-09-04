@@ -1,20 +1,21 @@
 version: "0.1"                        # 配置版本号
 
 database:
-  dsn: "maplehaze:Mhint@123@tcp(127.0.0.1:3307)/ssp?parseTime=true"  # 数据库连接串
+  dsn: "root:MySQLpassword@123456@tcp(127.0.0.1:3306)/oa_manage?charset=utf8mb4&parseTime=true"
   db: "mysql"                         # 数据库类型
 
   tables:                             # 要生成模型的表名列表
-    - sys_platform
     - sys_user
-    - sys_user_platform
+    - sys_platform
+    - sys_role
+    - sys_permission
+    - sys_role_permission
+    - sys_user_role
 
-  outPath: "./internal/db_model"                 # 生成代码输出目录（相对路径）
-  outFile: ""                         # 输出文件名（空则按表名生成多个文件）
+  outPath: "./internal/db_model/query"  # 查询代码输出目录
+  modelPkgPath: "./internal/db_model"   # 模型代码输出目录(含路径分隔符时相对项目根解析)
+  mode: "withoutContext"                # 生成模式: withoutContext 可直接 q.SysUser.Create(...) 调用
   withUnitTest: false                 # 是否生成单元测试文件
-  modelPkgName: "db_model"      # 生成代码的 package 名
-
-  onlyModel: false                    # 只生成 model，不生成 query 代码
   fieldNullable: true                 # 字段可 NULL 时用指针类型
   fieldWithIndexTag: false            # 是否在字段 tag 中标注索引
   fieldWithTypeTag: false             # 是否在字段 tag 中标注数据库类型

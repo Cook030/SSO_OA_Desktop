@@ -17,19 +17,25 @@ import (
 
 func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 	return &Query{
-		db:              db,
-		SysPlatform:     newSysPlatform(db, opts...),
-		SysUser:         newSysUser(db, opts...),
-		SysUserPlatform: newSysUserPlatform(db, opts...),
+		db:                db,
+		SysPermission:     newSysPermission(db, opts...),
+		SysPlatform:       newSysPlatform(db, opts...),
+		SysRole:           newSysRole(db, opts...),
+		SysRolePermission: newSysRolePermission(db, opts...),
+		SysUser:           newSysUser(db, opts...),
+		SysUserRole:       newSysUserRole(db, opts...),
 	}
 }
 
 type Query struct {
 	db *gorm.DB
 
-	SysPlatform     sysPlatform
-	SysUser         sysUser
-	SysUserPlatform sysUserPlatform
+	SysPermission     sysPermission
+	SysPlatform       sysPlatform
+	SysRole           sysRole
+	SysRolePermission sysRolePermission
+	SysUser           sysUser
+	SysUserRole       sysUserRole
 }
 
 func (q *Query) Available() bool { return q.db != nil }
@@ -38,10 +44,13 @@ func (q *Query) UnderlyingDB() *gorm.DB { return q.db }
 
 func (q *Query) clone(db *gorm.DB) *Query {
 	return &Query{
-		db:              db,
-		SysPlatform:     q.SysPlatform.clone(db),
-		SysUser:         q.SysUser.clone(db),
-		SysUserPlatform: q.SysUserPlatform.clone(db),
+		db:                db,
+		SysPermission:     q.SysPermission.clone(db),
+		SysPlatform:       q.SysPlatform.clone(db),
+		SysRole:           q.SysRole.clone(db),
+		SysRolePermission: q.SysRolePermission.clone(db),
+		SysUser:           q.SysUser.clone(db),
+		SysUserRole:       q.SysUserRole.clone(db),
 	}
 }
 
@@ -55,24 +64,33 @@ func (q *Query) WriteDB() *Query {
 
 func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 	return &Query{
-		db:              db,
-		SysPlatform:     q.SysPlatform.replaceDB(db),
-		SysUser:         q.SysUser.replaceDB(db),
-		SysUserPlatform: q.SysUserPlatform.replaceDB(db),
+		db:                db,
+		SysPermission:     q.SysPermission.replaceDB(db),
+		SysPlatform:       q.SysPlatform.replaceDB(db),
+		SysRole:           q.SysRole.replaceDB(db),
+		SysRolePermission: q.SysRolePermission.replaceDB(db),
+		SysUser:           q.SysUser.replaceDB(db),
+		SysUserRole:       q.SysUserRole.replaceDB(db),
 	}
 }
 
 type queryCtx struct {
-	SysPlatform     *sysPlatformDo
-	SysUser         *sysUserDo
-	SysUserPlatform *sysUserPlatformDo
+	SysPermission     *sysPermissionDo
+	SysPlatform       *sysPlatformDo
+	SysRole           *sysRoleDo
+	SysRolePermission *sysRolePermissionDo
+	SysUser           *sysUserDo
+	SysUserRole       *sysUserRoleDo
 }
 
 func (q *Query) WithContext(ctx context.Context) *queryCtx {
 	return &queryCtx{
-		SysPlatform:     q.SysPlatform.WithContext(ctx),
-		SysUser:         q.SysUser.WithContext(ctx),
-		SysUserPlatform: q.SysUserPlatform.WithContext(ctx),
+		SysPermission:     q.SysPermission.WithContext(ctx),
+		SysPlatform:       q.SysPlatform.WithContext(ctx),
+		SysRole:           q.SysRole.WithContext(ctx),
+		SysRolePermission: q.SysRolePermission.WithContext(ctx),
+		SysUser:           q.SysUser.WithContext(ctx),
+		SysUserRole:       q.SysUserRole.WithContext(ctx),
 	}
 }
 

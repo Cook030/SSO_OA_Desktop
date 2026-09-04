@@ -9,6 +9,7 @@ type EmployeeListItemDTO struct {
 	Phone               string               `json:"phone"`
 	Email               string               `json:"email"`
 	Department          string               `json:"department"`
+	Roles               []RoleOptionDTO      `json:"roles"`
 	PlatformPermissions []PlatformPermission `json:"platformPermissions"`
 }
 

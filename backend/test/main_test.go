@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"permission-system/internal/db_model"
 	"permission-system/internal/db_model/query"
 	"permission-system/internal/router"
+	"permission-system/internal/service/bootstrap"
 	"permission-system/internal/utils"
 	"permission-system/test/testutil"
 )
@@ -30,7 +30,10 @@ func TestMain(m *testing.M) {
 	}
 
 	q := query.Use(db)
-	initAdmin(q, &testutil.Cfg.Admin)
+	if err := bootstrap.InitRBAC(q, &testutil.Cfg.Admin); err != nil {
+		fmt.Fprintf(os.Stderr, "初始化 RBAC 失败: %v\n", err)
+		os.Exit(1)
+	}
 
 	// 启动 mock SSO 服务，并将配置指向它
 	mockSSO := newMockSSOServer(q)
@@ -134,34 +137,7 @@ func newMockSSOServer(q *query.Query) *httptest.Server {
 	return httptest.NewServer(mux)
 }
 
-// initAdmin 初始化管理员账号，与 cmd/server/main.go 逻辑保持一致
-func initAdmin(q *query.Query, adminCfg *utils.AdminConfig) {
-	count, err := q.SysUser.Where(q.SysUser.Role.Eq("admin")).Count()
-	if err != nil {
-		panic("查询管理员账号失败: " + err.Error())
-	}
-	if count > 0 {
-		return
-	}
 
-	hashedPassword, err := utils.HashPassword(adminCfg.Password)
-	if err != nil {
-		panic("管理员密码加密失败: " + err.Error())
-	}
-
-	admin := &db_model.SysUser{
-		Account:  adminCfg.Account,
-		Password: hashedPassword,
-		Name:     adminCfg.Name,
-		Phone:    adminCfg.Phone,
-		Email:    adminCfg.Email,
-		Role:     "admin",
-	}
-
-	if err := q.SysUser.Create(admin); err != nil {
-		panic("创建管理员账号失败: " + err.Error())
-	}
-}
 
 var globalEmployeeEmailPrefix string
 var globalAccount string

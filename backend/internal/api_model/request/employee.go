@@ -7,7 +7,7 @@ type CreateEmployeeRequest struct {
 	EmailPrefix string  `json:"emailPrefix"`
 	Account     string  `json:"account"`
 	Department  string  `json:"department"`
-	PlatformIDs []int64 `json:"platformIds"`
+	RoleIDs     []int64 `json:"roleIds"`
 	Password    string  `json:"password"`
 }
 
@@ -18,5 +18,5 @@ type UpdateEmployeeRequest struct {
 	EmailPrefix string  `json:"emailPrefix"`
 	Account     string  `json:"account"`
 	Department  string  `json:"department"`
-	PlatformIDs []int64 `json:"platformIds"`
+	RoleIDs     []int64 `json:"roleIds"`
 }

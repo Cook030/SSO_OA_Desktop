@@ -12,7 +12,7 @@ type PlatformPermission struct {
 type PlatformListItemDTO struct {
 	ID              int64     `json:"id"`
 	Name            string    `json:"name"`
-	Link            string    `json:"link"`
+	Code            string    `json:"code"`
 	PermissionCount int64     `json:"permissionCount"`
 	CreateTime      time.Time `json:"createTime"`
 }
@@ -21,7 +21,7 @@ type PlatformListItemDTO struct {
 type PlatformDTO struct {
 	ID   int64  `json:"id"`
 	Name string `json:"name"`
-	Link string `json:"link"`
+	Code string `json:"code"`
 }
 
 // PlatformPageResult 平台分页结果
