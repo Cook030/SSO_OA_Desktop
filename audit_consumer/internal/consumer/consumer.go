@@ -230,7 +230,7 @@ func (c *Consumer) persistRecords(ctx context.Context, records []*mapper.Record)
 		return err
 	}
 	if skipped > 0 {
-		c.log.Warn("部分审计记录因外键被跳过(操作人已删除)",
+		c.log.Warn("部分审计记录因记录级错误被跳过(操作人已删除/字段超长等)",
 			zap.Int("skipped", skipped))
 	}
 	c.log.Info("审计记录入库",

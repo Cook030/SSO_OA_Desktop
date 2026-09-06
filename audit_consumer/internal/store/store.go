@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-sql-driver/mysql"
@@ -13,14 +14,36 @@ import (
 	"mh-audit-consumer/internal/mapper"
 )
 
-// 幂等依赖 uk_dedup 唯一键: 重放/重复投递的记录被 INSERT IGNORE 静默跳过。
-// source=1 固定表示 binlog 通道来源。
-const insertStmt = `INSERT IGNORE INTO sys_audit_log
+// 幂等依赖 uk_dedup 唯一键: 重放/重复投递的记录命中 ON DUPLICATE KEY UPDATE 后原地 no-op。
+// 不使用 INSERT IGNORE: 它会把外键失败(1452)降级为 warning 并静默丢行, 使调用方无法感知。
+// source 固定为 1(binlog 通道来源), 不占占位符。
+const (
+	insertPrefix = `INSERT INTO sys_audit_log
 	(operator_id, action, target_type, target_id, detail, before_data, source, dedup_key, request_id, create_time)
-	VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`
+	VALUES `
+	rowValues = "(?, ?, ?, ?, ?, ?, 1, ?, ?, ?)"
+	// onDupNoop 把唯一键冲突转为 no-op(赋值自身), 仅维持幂等, 不改变任何列。
+	onDupNoop = " ON DUPLICATE KEY UPDATE dedup_key = dedup_key"
+)
 
-// errNoFKReferenced MySQL 外键不存在错误码(operator_id 引用的用户已被删除)。
-const errNoFKReferenced = 1452
+// argsPerRow 单行占位符个数, 必须与 rowValues 保持一致。
+const argsPerRow = 9
+
+// maxRowsPerStmt 单条 INSERT 的最大行数。
+// MySQL 预处理语句占位符上限 65535(即 7281 行), 取 500 是为了控制单语句包体: detail/before_data 为 JSON 文本。
+const maxRowsPerStmt = 500
+
+// singleRowStmt 单条插入语句, 逐条回退时使用; 固定字符串可命中 database/sql 的 stmt 缓存。
+var singleRowStmt = insertPrefix + rowValues + onDupNoop
+
+// 记录级错误码: 这类错误说明"该行本身写不进去", 重试无意义, 只能跳过该行;
+// 其余错误(连接中断、死锁 1213、锁等待超时 1205 等)必须整批重试, 不能静默丢数据。
+const (
+	errDupEntry       = 1062 // 唯一键冲突(兜底; 正常已由 ON DUPLICATE KEY UPDATE 消化)
+	errBadNull        = 1048 // 非空列收到 NULL
+	errNoFKReferenced = 1452 // 外键不存在: operator_id 引用的用户已被物理删除
+	errDataTooLong    = 1406 // 字段超长: detail/before_data 超出列容量
+)
 
 // Store 审计库写入器。
 type Store struct {
@@ -52,34 +75,62 @@ func (s *Store) Close() error {
 }
 
 // BatchInsert 批量插入审计记录。
-// 返回 skipped: 因外键(操作人已被物理删除)被跳过的记录数; 批量语句失败会回退逐条插入。
+// 返回 skipped: 因记录级错误(操作人已删除/字段超长等)被跳过的记录数; 批量语句命中记录级错误时回退逐条插入。
 func (s *Store) BatchInsert(ctx context.Context, records []*mapper.Record) (int, error) {
 	if len(records) == 0 {
 		return 0, nil
 	}
-	if err := s.insertBatch(ctx, records); err == nil {
-		return 0, nil
-	} else if isFKError(err) {
-		return s.insertOneByOne(ctx, records)
-	} else {
-		return 0, fmt.Errorf("批量写入审计日志失败: %w", err)
+	skipped := 0
+	for start := 0; start < len(records); start += maxRowsPerStmt {
+		end := min(start+maxRowsPerStmt, len(records))
+		chunk := records[start:end]
+
+		err := s.insertBatch(ctx, chunk)
+		if err == nil {
+			continue
+		}
+		if !isRecordLevelError(err) {
+			return skipped, fmt.Errorf("批量写入审计日志失败: %w", err)
+		}
+		n, err := s.insertOneByOne(ctx, chunk)
+		skipped += n
+		if err != nil {
+			return skipped, err
+		}
 	}
+	return skipped, nil
 }
 
 func (s *Store) insertBatch(ctx context.Context, records []*mapper.Record) error {
-	_, err := s.db.ExecContext(ctx, insertStmt, batchArgs(records)...)
+	_, err := s.db.ExecContext(ctx, buildInsertSQL(len(records)), batchArgs(records)...)
 	return err
 }
 
+// buildInsertSQL 按行数动态拼接多组 VALUES, 保证占位符数与 batchArgs 产出的参数数一致。
+func buildInsertSQL(rows int) string {
+	if rows <= 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.Grow(len(insertPrefix) + rows*(len(rowValues)+1) + len(onDupNoop))
+	b.WriteString(insertPrefix)
+	b.WriteString(rowValues)
+	if rows > 1 {
+		b.WriteString(strings.Repeat(","+rowValues, rows-1))
+	}
+	b.WriteString(onDupNoop)
+	return b.String()
+}
+
 func batchArgs(records []*mapper.Record) []any {
-	args := make([]any, 0, len(records)*9)
+	args := make([]any, 0, len(records)*argsPerRow)
 	for _, record := range records {
 		args = append(args, insertArgs(record)...)
 	}
 	return args
 }
 
-// insertOneByOne 逐条插入并隔离外键失败行(单条语句原子, 失败即该行跳过)。
+// insertOneByOne 逐条插入并隔离问题行(单条语句原子, 记录级错误跳过该行后继续)。
 func (s *Store) insertOneByOne(ctx context.Context, records []*mapper.Record) (int, error) {
 	skipped := 0
 	for _, record := range records {
@@ -94,19 +145,19 @@ func (s *Store) insertOneByOne(ctx context.Context, records []*mapper.Record) (i
 	return skipped, nil
 }
 
-// insertOne 返回该记录是否因操作人外键缺失而被跳过。
+// insertOne 返回该记录是否因记录级错误被跳过。
 func (s *Store) insertOne(ctx context.Context, record *mapper.Record) (bool, error) {
-	_, err := s.db.ExecContext(ctx, insertStmt, insertArgs(record)...)
+	_, err := s.db.ExecContext(ctx, singleRowStmt, insertArgs(record)...)
 	if err == nil {
 		return false, nil
 	}
-	if isFKError(err) {
+	if isRecordLevelError(err) {
 		return true, nil
 	}
 	return false, fmt.Errorf("单条写入审计日志失败: %w", err)
 }
 
-// insertArgs 组装单条记录参数, 与 insertStmt 的 9 个占位符一一对应。
+// insertArgs 组装单条记录参数, 与 rowValues 的 9 个占位符一一对应。
 func insertArgs(r *mapper.Record) []any {
 	event := time.Now()
 	if r.EventTime != nil {
@@ -125,7 +176,16 @@ func insertArgs(r *mapper.Record) []any {
 	}
 }
 
-func isFKError(err error) bool {
+// isRecordLevelError 判断错误是否只影响当前行。
+func isRecordLevelError(err error) bool {
 	var me *mysql.MySQLError
-	return errors.As(err, &me) && me.Number == errNoFKReferenced
+	if !errors.As(err, &me) {
+		return false
+	}
+	switch me.Number {
+	case errDupEntry, errBadNull, errNoFKReferenced, errDataTooLong:
+		return true
+	default:
+		return false
+	}
 }
