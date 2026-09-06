@@ -54,32 +54,56 @@ func (s *Store) Close() error {
 // BatchInsert 批量插入审计记录。
 // 返回 skipped: 因外键(操作人已被物理删除)被跳过的记录数; 批量语句失败会回退逐条插入。
 func (s *Store) BatchInsert(ctx context.Context, records []*mapper.Record) (int, error) {
-	args := make([]any, 0, len(records)*9)
-	for _, r := range records {
-		args = append(args, insertArgs(r)...)
+	if len(records) == 0 {
+		return 0, nil
 	}
-	if _, err := s.db.ExecContext(ctx, insertStmt, args...); err != nil {
-		if isFKError(err) {
-			return s.insertOneByOne(ctx, records)
-		}
+	if err := s.insertBatch(ctx, records); err == nil {
+		return 0, nil
+	} else if isFKError(err) {
+		return s.insertOneByOne(ctx, records)
+	} else {
 		return 0, fmt.Errorf("批量写入审计日志失败: %w", err)
 	}
-	return 0, nil
+}
+
+func (s *Store) insertBatch(ctx context.Context, records []*mapper.Record) error {
+	_, err := s.db.ExecContext(ctx, insertStmt, batchArgs(records)...)
+	return err
+}
+
+func batchArgs(records []*mapper.Record) []any {
+	args := make([]any, 0, len(records)*9)
+	for _, record := range records {
+		args = append(args, insertArgs(record)...)
+	}
+	return args
 }
 
 // insertOneByOne 逐条插入并隔离外键失败行(单条语句原子, 失败即该行跳过)。
 func (s *Store) insertOneByOne(ctx context.Context, records []*mapper.Record) (int, error) {
 	skipped := 0
-	for _, r := range records {
-		if _, err := s.db.ExecContext(ctx, insertStmt, insertArgs(r)...); err != nil {
-			if isFKError(err) {
-				skipped++
-				continue
-			}
-			return skipped, fmt.Errorf("单条写入审计日志失败: %w", err)
+	for _, record := range records {
+		wasSkipped, err := s.insertOne(ctx, record)
+		if err != nil {
+			return skipped, err
+		}
+		if wasSkipped {
+			skipped++
 		}
 	}
 	return skipped, nil
+}
+
+// insertOne 返回该记录是否因操作人外键缺失而被跳过。
+func (s *Store) insertOne(ctx context.Context, record *mapper.Record) (bool, error) {
+	_, err := s.db.ExecContext(ctx, insertStmt, insertArgs(record)...)
+	if err == nil {
+		return false, nil
+	}
+	if isFKError(err) {
+		return true, nil
+	}
+	return false, fmt.Errorf("单条写入审计日志失败: %w", err)
 }
 
 // insertArgs 组装单条记录参数, 与 insertStmt 的 9 个占位符一一对应。

@@ -20,16 +20,32 @@ import (
 // Consumer Kafka 消费器。
 type Consumer struct {
 	cfg    *config.Config
-	reader *kafka.Reader
+	reader messageReader
 	mapper *mapper.Mapper
-	store  *store.Store
+	store  auditStore
 	log    *zap.Logger
 	dead   *DeadLetter
 }
 
+// messageReader 是 Consumer 需要的 Kafka 最小能力集，隔离具体客户端实现。
+type messageReader interface {
+	FetchMessage(context.Context) (kafka.Message, error)
+	CommitMessages(context.Context, ...kafka.Message) error
+	Close() error
+}
+
+// auditStore 是 Consumer 需要的审计持久化能力，便于替换与单测。
+type auditStore interface {
+	BatchInsert(context.Context, []*mapper.Record) (int, error)
+}
+
 // New 构造 Consumer。
 func New(cfg *config.Config, st *store.Store, mp *mapper.Mapper, log *zap.Logger) *Consumer {
-	reader := kafka.NewReader(kafka.ReaderConfig{
+	return newConsumer(cfg, newKafkaReader(cfg), st, mp, log)
+}
+
+func newKafkaReader(cfg *config.Config) *kafka.Reader {
+	return kafka.NewReader(kafka.ReaderConfig{
 		Brokers:        cfg.Kafka.Brokers,
 		GroupID:        cfg.Kafka.GroupID,
 		Topic:          cfg.Kafka.Topic,
@@ -40,6 +56,9 @@ func New(cfg *config.Config, st *store.Store, mp *mapper.Mapper, log *zap.Logger
 		CommitInterval: 0, // 关闭自动提交, 入库成功后再手动 CommitMessages
 		StartOffset:    kafka.FirstOffset,
 	})
+}
+
+func newConsumer(cfg *config.Config, reader messageReader, st auditStore, mp *mapper.Mapper, log *zap.Logger) *Consumer {
 	return &Consumer{
 		cfg:    cfg,
 		reader: reader,
@@ -57,24 +76,20 @@ func (c *Consumer) Close() error {
 
 // Run 主循环: 攒批拉取 -> 处理入库 -> 成功才提交 offset。
 func (c *Consumer) Run(ctx context.Context) error {
-	c.log.Info("audit-consumer 启动",
-		zap.Strings("brokers", c.cfg.Kafka.Brokers),
-		zap.String("topic", c.cfg.Kafka.Topic),
-		zap.String("group", c.cfg.Kafka.GroupID))
+	c.logStartup()
 
 	backoff := time.Second
 	for {
-		if ctx.Err() != nil {
+		if isCancelled(ctx) {
 			return nil
 		}
 
 		batch, err := c.fetchBatch(ctx)
 		if err != nil {
-			if ctx.Err() != nil {
+			if isCancelled(ctx) {
 				return nil
 			}
-			c.log.Warn("拉取Kafka消息失败", zap.Error(err))
-			if !c.sleep(ctx, backoff) {
+			if !c.retryAfterFetchFailure(ctx, err, backoff) {
 				return nil
 			}
 			backoff = nextBackoff(backoff, c.cfg.Kafka.RetryMaxBackoffMs)
@@ -86,22 +101,49 @@ func (c *Consumer) Run(ctx context.Context) error {
 
 		backoff = time.Second
 		if err := c.process(ctx, batch); err != nil {
-			c.log.Error("处理批次失败, 暂不提交offset并重试",
-				zap.Int("count", len(batch)), zap.Error(err))
+			c.logProcessFailure(len(batch), err)
 			if !c.sleep(ctx, backoff) {
 				return nil
 			}
 			continue
 		}
 
-		if err := c.reader.CommitMessages(ctx, batch...); err != nil {
-			// 提交失败: 消息会再次被拉到, 由 dedup_key 幂等兜底。
-			c.log.Error("提交offset失败", zap.Error(err))
+		if !c.commit(ctx, batch) {
 			continue
 		}
-		c.log.Info("批次处理完成并已提交",
-			zap.Int("count", len(batch)))
+		c.logBatchCommitted(len(batch))
 	}
+}
+
+func (c *Consumer) logStartup() {
+	c.log.Info("audit-consumer 启动",
+		zap.Strings("brokers", c.cfg.Kafka.Brokers),
+		zap.String("topic", c.cfg.Kafka.Topic),
+		zap.String("group", c.cfg.Kafka.GroupID))
+}
+
+func isCancelled(ctx context.Context) bool { return ctx.Err() != nil }
+
+func (c *Consumer) retryAfterFetchFailure(ctx context.Context, err error, backoff time.Duration) bool {
+	c.log.Warn("拉取Kafka消息失败", zap.Error(err))
+	return c.sleep(ctx, backoff)
+}
+
+func (c *Consumer) logProcessFailure(batchSize int, err error) {
+	c.log.Error("处理批次失败, 暂不提交offset并重试", zap.Int("count", batchSize), zap.Error(err))
+}
+
+// commit 仅在审计记录已成功持久化后提交 offset；提交失败由 dedup_key 支持安全重放。
+func (c *Consumer) commit(ctx context.Context, batch []kafka.Message) bool {
+	if err := c.reader.CommitMessages(ctx, batch...); err != nil {
+		c.log.Error("提交offset失败", zap.Error(err))
+		return false
+	}
+	return true
+}
+
+func (c *Consumer) logBatchCommitted(batchSize int) {
+	c.log.Info("批次处理完成并已提交", zap.Int("count", batchSize))
 }
 
 // fetchBatch 拉取一批消息: 首条阻塞等待, 之后按 flush_interval 攒批。
@@ -141,29 +183,48 @@ func (c *Consumer) fetchBatch(ctx context.Context) ([]kafka.Message, error) {
 // process 将批次解析为审计记录并批量入库。
 // 单条消息解析失败只走死信, 不影响整批提交; 入库失败才整体返回错误。
 func (c *Consumer) process(ctx context.Context, batch []kafka.Message) error {
+	records := c.buildRecords(batch)
+	if len(records) == 0 {
+		return nil
+	}
+	return c.persistRecords(ctx, records)
+}
+
+func (c *Consumer) buildRecords(batch []kafka.Message) []*mapper.Record {
 	records := make([]*mapper.Record, 0)
 	for _, msg := range batch {
-		flats, err := canal.DecodeValue(msg.Value)
+		records = append(records, c.buildMessageRecords(msg)...)
+	}
+	return records
+}
+
+func (c *Consumer) buildMessageRecords(msg kafka.Message) []*mapper.Record {
+	flats, err := canal.DecodeValue(msg.Value)
+	if err != nil {
+		c.dead.Write(msg, err)
+		return nil
+	}
+
+	records := make([]*mapper.Record, 0)
+	for _, flat := range flats {
+		if !isAuditable(flat) {
+			continue
+		}
+		rs, err := c.mapper.Build(flat)
 		if err != nil {
 			c.dead.Write(msg, err)
 			continue
 		}
-		for _, flat := range flats {
-			if flat == nil || !flat.IsDML() || flat.IsDDLEvent() {
-				continue
-			}
-			rs, err := c.mapper.Build(flat)
-			if err != nil {
-				c.dead.Write(msg, err)
-				continue
-			}
-			records = append(records, rs...)
-		}
+		records = append(records, rs...)
 	}
-	if len(records) == 0 {
-		return nil
-	}
+	return records
+}
 
+func isAuditable(flat *canal.FlatMessage) bool {
+	return flat != nil && flat.IsDML() && !flat.IsDDLEvent()
+}
+
+func (c *Consumer) persistRecords(ctx context.Context, records []*mapper.Record) error {
 	skipped, err := c.store.BatchInsert(ctx, records)
 	if err != nil {
 		return err

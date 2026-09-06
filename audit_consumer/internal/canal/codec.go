@@ -11,10 +11,7 @@
 // CanalEntry.Entry.header, 这正是 flatMessage=true 的 JSON 所不提供的字段。
 package canal
 
-import (
-	"errors"
-	"fmt"
-)
+import "fmt"
 
 // ---- CanalProtocol.proto / EntryProtocol.proto 枚举常量(canal-1.1.7, proto3) ----
 const (
@@ -31,167 +28,7 @@ const (
 	eventDelete = 3
 )
 
-var (
-	errTruncated   = errors.New("protobuf 字节流截断")
-	errBadVarint   = errors.New("protobuf varint 编码非法")
-	errWireType    = errors.New("不支持的 protobuf wire type")
-	errCompression = errors.New("不支持的报文压缩方式")
-)
-
-// pbReader 只读 protobuf wire 流解析器, 未知字段一律跳过, 保证协议向后兼容。
-type pbReader struct {
-	b   []byte
-	off int
-}
-
-func (r *pbReader) done() bool { return r.off >= len(r.b) }
-
-func (r *pbReader) varint() (uint64, error) {
-	var x uint64
-	var s uint
-	for i := 0; i < 10; i++ {
-		if r.off >= len(r.b) {
-			return 0, errTruncated
-		}
-		b := r.b[r.off]
-		r.off++
-		if b < 0x80 {
-			if i == 9 && b > 1 {
-				return 0, errBadVarint
-			}
-			return x | uint64(b)<<s, nil
-		}
-		x |= uint64(b&0x7f) << s
-		s += 7
-	}
-	return 0, errBadVarint
-}
-
-func (r *pbReader) bytes() ([]byte, error) {
-	n, err := r.varint()
-	if err != nil {
-		return nil, err
-	}
-	if n > uint64(len(r.b)-r.off) {
-		return nil, errTruncated
-	}
-	out := r.b[r.off : r.off+int(n)]
-	r.off += int(n)
-	return out, nil
-}
-
-func (r *pbReader) skip(wire int) error {
-	switch wire {
-	case 0: // varint
-		_, err := r.varint()
-		return err
-	case 1: // 64-bit
-		if len(r.b)-r.off < 8 {
-			return errTruncated
-		}
-		r.off += 8
-		return nil
-	case 2: // length-delimited
-		_, err := r.bytes()
-		return err
-	case 5: // 32-bit
-		if len(r.b)-r.off < 4 {
-			return errTruncated
-		}
-		r.off += 4
-		return nil
-	default:
-		return fmt.Errorf("%w: %d", errWireType, wire)
-	}
-}
-
-// nextField 读取下一个字段的 field number 与 wire type。
-func (r *pbReader) nextField() (field int, wire int, err error) {
-	tag, err := r.varint()
-	if err != nil {
-		return 0, 0, err
-	}
-	return int(tag >> 3), int(tag & 7), nil
-}
-
 // ---- 协议解码: 每个 message 对应一个函数, 只解需要的字段, 其余跳过 ----
-
-// decodePacket 解析 CanalProtocol.Packet: type(3)/compression(4)/body(5)。
-func decodePacket(b []byte) (msgType, compression int, body []byte, err error) {
-	r := &pbReader{b: b}
-	for !r.done() {
-		field, wire, err := r.nextField()
-		if err != nil {
-			return 0, 0, nil, err
-		}
-		switch field {
-		case 3:
-			if wire != 0 {
-				return 0, 0, nil, fmt.Errorf("Packet.type 期望 varint, 实际 wire=%d", wire)
-			}
-			v, err := r.varint()
-			if err != nil {
-				return 0, 0, nil, err
-			}
-			msgType = int(v)
-		case 4:
-			if wire != 0 {
-				return 0, 0, nil, fmt.Errorf("Packet.compression 期望 varint, 实际 wire=%d", wire)
-			}
-			v, err := r.varint()
-			if err != nil {
-				return 0, 0, nil, err
-			}
-			compression = int(v)
-		case 5:
-			body, err = r.bytes()
-			if err != nil {
-				return 0, 0, nil, err
-			}
-		default:
-			if err := r.skip(wire); err != nil {
-				return 0, 0, nil, err
-			}
-		}
-	}
-	return msgType, compression, body, nil
-}
-
-// decodeMessages 解析 CanalProtocol.Messages: batch_id(1)/messages(2, repeated bytes)。
-func decodeMessages(b []byte) (batchID int64, entries [][]byte, err error) {
-	r := &pbReader{b: b}
-	for !r.done() {
-		field, wire, err := r.nextField()
-		if err != nil {
-			return 0, nil, err
-		}
-		switch field {
-		case 1:
-			if wire != 0 {
-				return 0, nil, fmt.Errorf("Messages.batch_id 期望 varint, 实际 wire=%d", wire)
-			}
-			v, err := r.varint()
-			if err != nil {
-				return 0, nil, err
-			}
-			batchID = int64(v)
-		case 2:
-			if wire != 2 {
-				return 0, nil, fmt.Errorf("Messages.messages 期望 bytes, 实际 wire=%d", wire)
-			}
-			eb, err := r.bytes()
-			if err != nil {
-				return 0, nil, err
-			}
-			entries = append(entries, eb)
-		default:
-			if err := r.skip(wire); err != nil {
-				return 0, nil, err
-			}
-		}
-	}
-	return batchID, entries, nil
-}
 
 // decodeEntry 解析 CanalEntry.Entry 的 header 关键字段, 并取出 entryType 与 storeValue。
 func decodeEntry(b []byte) (logfile string, offset, executeTime int64, schemaName, tableName, gtid string,
@@ -577,18 +414,18 @@ func entryToFlat(eb []byte) (*FlatMessage, error) {
 	}
 
 	fm := &FlatMessage{
-		Database:        schemaName,
-		Table:           tableName,
-		Type:            name,
-		IsDdl:           rc.isDdl,
-		ES:              executeTime,
-		SQL:             rc.sql,
-		GTID:            gtid,
-		BinlogFileName:  logfile,
-		BinlogPosition:  offset,
-		Data:            make([]map[string]*string, 0, len(rc.rowDatas)),
-		MySQLType:       make(map[string]string),
-		SQLType:         make(map[string]int32),
+		Database:       schemaName,
+		Table:          tableName,
+		Type:           name,
+		IsDdl:          rc.isDdl,
+		ES:             executeTime,
+		SQL:            rc.sql,
+		GTID:           gtid,
+		BinlogFileName: logfile,
+		BinlogPosition: offset,
+		Data:           make([]map[string]*string, 0, len(rc.rowDatas)),
+		MySQLType:      make(map[string]string),
+		SQLType:        make(map[string]int32),
 	}
 
 	for _, rd := range rc.rowDatas {
