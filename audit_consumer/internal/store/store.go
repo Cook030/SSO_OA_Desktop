@@ -14,15 +14,15 @@ import (
 	"mh-audit-consumer/internal/mapper"
 )
 
-// 幂等依赖 uk_dedup 唯一键: 重放/重复投递的记录命中 ON DUPLICATE KEY UPDATE 后原地 no-op。
-// 不使用 INSERT IGNORE: 它会把外键失败(1452)降级为 warning 并静默丢行, 使调用方无法感知。
-// source 固定为 1(binlog 通道来源), 不占占位符。
 const (
 	insertPrefix = `INSERT INTO sys_audit_log
 	(operator_id, action, target_type, target_id, detail, before_data, source, dedup_key, request_id, create_time)
 	VALUES `
 	rowValues = "(?, ?, ?, ?, ?, ?, 1, ?, ?, ?)"
-	// onDupNoop 把唯一键冲突转为 no-op(赋值自身), 仅维持幂等, 不改变任何列。
+	//消费者是at-least-once的，即消息至少被处理一次
+	//使用dedup_key这一组合字段保证唯一
+	//当执行INSERT违反了唯一索引dedup_key，MySQL不会报错，而是转成UPDATE
+	//只处理唯一键冲突，更新dedup_key，其他错误正常抛出
 	onDupNoop = " ON DUPLICATE KEY UPDATE dedup_key = dedup_key"
 )
 
@@ -30,7 +30,6 @@ const (
 const argsPerRow = 9
 
 // maxRowsPerStmt 单条 INSERT 的最大行数。
-// MySQL 预处理语句占位符上限 65535(即 7281 行), 取 500 是为了控制单语句包体: detail/before_data 为 JSON 文本。
 const maxRowsPerStmt = 500
 
 // singleRowStmt 单条插入语句, 逐条回退时使用; 固定字符串可命中 database/sql 的 stmt 缓存。
