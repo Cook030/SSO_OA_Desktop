@@ -152,7 +152,8 @@ const AppLayout: React.FC = () => {
 
       // 跳转到 SSO 登录页
       // 使用从网页解析中获取的完整登录 URL
-      window.location.href = "https://sso2.maplehaze.cn";
+      // window.location.href = "https://sso2.maplehaze.cn"; // 线上 SSO
+      window.location.href = "http://localhost:8004"; // 纯本地 SSO 前端
     }
   };
 

@@ -11,7 +11,8 @@ interface SsoApiResponse<T = any> {
 
 // 1. 创建专门用于 SSO 的 axios 实例
 const ssoRequest: AxiosInstance = axios.create({
-  baseURL: "https://sso2.maplehaze.cn", // ⬅️ 直接指向 SSO 域名
+  // baseURL: "https://sso2.maplehaze.cn", // ⬅️ 直接指向 SSO 域名（线上）
+  baseURL: "", // 纯本地：走同源 vite proxy（/api/v1/auth/ -> http://127.0.0.1:8081）
   timeout: 10000,
   withCredentials: true, // ⬅️ 关键：跨域请求携带 Cookie，SSO 登录态通常依赖 Cookie
   headers: {

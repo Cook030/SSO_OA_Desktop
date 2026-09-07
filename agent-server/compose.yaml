@@ -1,0 +1,33 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: oa_agent
+      POSTGRES_USER: oa_agent
+      POSTGRES_PASSWORD: ${AGENT_DB_PASSWORD:?Set AGENT_DB_PASSWORD}
+    volumes:
+      - agent_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oa_agent -d oa_agent"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  agent:
+    build: .
+    ports:
+      - "127.0.0.1:8090:8090"
+    environment:
+      AGENT_DATABASE_URL: postgresql+psycopg://oa_agent:${AGENT_DB_PASSWORD}@postgres:5432/oa_agent
+      AGENT_CHECKPOINT_URL: postgresql://oa_agent:${AGENT_DB_PASSWORD}@postgres:5432/oa_agent
+      AGENT_ENCRYPTION_KEY: ${AGENT_ENCRYPTION_KEY:?Set AGENT_ENCRYPTION_KEY}
+      AGENT_MODEL_BASE_URL: ${AGENT_MODEL_BASE_URL:-https://api.openai.com/v1}
+      AGENT_MODEL_NAME: ${AGENT_MODEL_NAME:?Set AGENT_MODEL_NAME}
+      AGENT_MODEL_API_KEY: ${AGENT_MODEL_API_KEY:?Set AGENT_MODEL_API_KEY}
+      AGENT_OA_URL: ${AGENT_OA_URL:?Set AGENT_OA_URL to an address reachable inside the container}
+      AGENT_SSO_URL: ${AGENT_SSO_URL:?Set AGENT_SSO_URL to an address reachable inside the container}
+      AGENT_CORS_ORIGINS: ${AGENT_CORS_ORIGINS:-["http://localhost:5173","http://127.0.0.1:5173","http://wails.localhost","wails://wails"]}
+    depends_on:
+      postgres:
+        condition: service_healthy
+volumes:
+  agent_postgres:

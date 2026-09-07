@@ -13,18 +13,19 @@ var assets embed.FS
 
 func main() {
 	// Create an instance of the app structure
-	app := NewApp()
+	app := &Desktop{}
 
 	// Create application with options
 	err := wails.Run(&options.App{
-		Title:  "workbench",
-		Width:  1024,
-		Height: 768,
+		Title:     "智工 · 企业工作台",
+		Width:     1280,
+		Height:    820,
+		MinWidth:  800,
+		MinHeight: 600,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
-		OnStartup:        app.startup,
+		BackgroundColour: &options.RGBA{R: 249, G: 249, B: 247, A: 1},
 		Bind: []interface{}{
 			app,
 		},

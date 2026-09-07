@@ -13,10 +13,12 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    // port: 5173, // 默认端口（与本地 oa 前端 5173 冲突）
+    port: 8004, // 纯本地：SSO 前端端口，与 oa 前端（5173）区分
     proxy: {
       "/api": {
-        target: "http://127.0.0.1:8080",
+        // target: "http://127.0.0.1:8080", // 原 SSO 后端端口（与 oa 后端冲突）
+        target: "http://127.0.0.1:8081", // 纯本地：sso/server 已改为 8081
         changeOrigin: true,
       },
     },

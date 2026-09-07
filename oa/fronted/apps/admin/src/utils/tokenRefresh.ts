@@ -1,7 +1,13 @@
 import axios from "axios";
 
-const SSO_LOGIN_URL = "https://sso2.maplehaze.cn/login?redirect=https%3A%2F%2Foa.maplehaze.cn%2F";
-const REFRESH_ENDPOINT = "https://sso2.maplehaze.cn/api/v1/auth/refresh";
+// 线上：跳转 SSO 登录页并回跳线上 OA
+// const SSO_LOGIN_URL = "https://sso2.maplehaze.cn/login?redirect=https%3A%2F%2Foa.maplehaze.cn%2F";
+// 纯本地：跳转本地 SSO 前端（localhost:8004）并回跳本地 OA 前端
+const SSO_LOGIN_URL = "http://localhost:8004/login?redirect=http%3A%2F%2Flocalhost%3A5173%2Fadmin%2F";
+// 线上：直连 SSO 域名刷新接口
+// const REFRESH_ENDPOINT = "https://sso2.maplehaze.cn/api/v1/auth/refresh";
+// 纯本地：同源路径，经 vite proxy（/api/v1/auth/ -> http://127.0.0.1:8081）转发
+const REFRESH_ENDPOINT = "/api/v1/auth/refresh";
 
 let refreshPromise: Promise<boolean> | null = null;
 let hasRedirected = false;

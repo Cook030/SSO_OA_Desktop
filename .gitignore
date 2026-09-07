@@ -5,3 +5,16 @@ sql/
 
 # 桌面端产品文档与本地产物
 desktop/
+
+# Workbench / Agent local runtime data
+.pnpm-store/
+workbench/.gocache/
+workbench/*.exe
+agent-server/.venv/
+agent-server/.uv-cache/
+agent-server/.pytest_cache/
+agent-server/.ruff_cache/
+agent-server/**/__pycache__/
+agent-server/.env
+agent-server/data/
+agent-server/*.egg-info/
