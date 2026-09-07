@@ -65,7 +65,7 @@ func newConsumer(cfg *config.Config, reader messageReader, st auditStore, mp *ma
 		mapper: mp,
 		store:  st,
 		log:    log,
-		dead:   NewDeadLetter("dead_letter", log),
+		dead:   NewDeadLetter(cfg.DeadLetter, log),
 	}
 }
 

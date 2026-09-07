@@ -14,11 +14,12 @@ import (
 
 // Config 顶层配置。
 type Config struct {
-	Kafka    KafkaConfig
-	MySQL    MySQLConfig
-	Sanitize SanitizeConfig
-	Mapping  map[string]mapper.TableMapping
-	Log      LogConfig
+	Kafka      KafkaConfig
+	MySQL      MySQLConfig
+	Sanitize   SanitizeConfig
+	Mapping    map[string]mapper.TableMapping
+	Log        LogConfig
+	DeadLetter DeadLetterConfig `mapstructure:"dead_letter"`
 }
 
 // KafkaConfig Kafka 消费组配置。
@@ -69,6 +70,14 @@ type SanitizeConfig struct {
 // LogConfig 日志级别。
 type LogConfig struct {
 	Level string
+}
+
+// DeadLetterConfig 死信落盘配置。
+// 两个上限均为: 0 或未配置 = 使用默认值, 负数 = 不限制。
+type DeadLetterConfig struct {
+	Dir       string `mapstructure:"dir"`
+	MaxFiles  int    `mapstructure:"max_files"`
+	MaxSizeMb int    `mapstructure:"max_size_mb"`
 }
 
 // Load 读取并解析配置文件。
@@ -129,6 +138,15 @@ func (c *Config) applyDefaults() {
 	}
 	if c.Log.Level == "" {
 		c.Log.Level = "info"
+	}
+	if c.DeadLetter.Dir == "" {
+		c.DeadLetter.Dir = "dead_letter"
+	}
+	if c.DeadLetter.MaxFiles == 0 {
+		c.DeadLetter.MaxFiles = 30
+	}
+	if c.DeadLetter.MaxSizeMb == 0 {
+		c.DeadLetter.MaxSizeMb = 512
 	}
 }
 

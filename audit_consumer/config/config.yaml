@@ -44,5 +44,12 @@ mapping:
   sys_role_permission: { target_type: role,       key: role_id }
   sys_user_platform:   { target_type: user,       key: user_id }
 
+# 死信落盘: 无法解析/映射的消息写本地文件, 便于人工核查与按 offset 补采
+# 上限超出时自动删除最旧文件; 0 或未配置 = 使用默认值, 负数 = 不限制
+dead_letter:
+  dir: "dead_letter"      # 落盘目录(相对进程工作目录, 建议配绝对路径)
+  max_files: 30           # 目录内保留文件数上限(默认30)
+  max_size_mb: 512        # 目录总大小上限MB(默认512)
+
 log:
   level: "info"          # debug / info / warn / error
