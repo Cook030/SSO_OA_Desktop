@@ -24,7 +24,7 @@ type Consumer struct {
 	mapper *mapper.Mapper
 	store  auditStore
 	log    *zap.Logger
-	dead   *DeadLetter
+	dead   deadLetterWriter
 }
 
 // messageReader 是 Consumer 需要的 Kafka 最小能力集，隔离具体客户端实现。
@@ -36,7 +36,12 @@ type messageReader interface {
 
 // auditStore 是 Consumer 需要的审计持久化能力，便于替换与单测。
 type auditStore interface {
-	BatchInsert(context.Context, []*mapper.Record) (int, error)
+	BatchInsert(context.Context, []*mapper.Record) error
+}
+
+// deadLetterWriter 隔离死信存储；死信未可靠写入时，消息不能被确认。
+type deadLetterWriter interface {
+	Write(kafka.Message, error) error
 }
 
 // New 构造 Consumer。
@@ -79,39 +84,61 @@ func (c *Consumer) Run(ctx context.Context) error {
 	c.logStartup()
 
 	backoff := time.Second
+	var pending []kafka.Message
+	processed := false
 	for {
 		if isCancelled(ctx) {
 			return nil
 		}
 
-		batch, err := c.fetchBatch(ctx)
-		if err != nil {
-			if isCancelled(ctx) {
-				return nil
+		if len(pending) == 0 {
+			batch, err := c.fetchBatch(ctx)
+			if len(batch) > 0 {
+				// 已经取得的消息不能因后续拉取失败而丢弃；处理完成前不再拉新消息。
+				pending = batch
+				processed = false
+				backoff = time.Second
+				if err != nil {
+					c.log.Warn("攒批时拉取Kafka消息失败，将先处理已获取消息",
+						zap.Int("count", len(pending)), zap.Error(err))
+				}
+			} else if err != nil {
+				if isCancelled(ctx) {
+					return nil
+				}
+				if !c.retryAfterFetchFailure(ctx, err, backoff) {
+					return nil
+				}
+				backoff = nextBackoff(backoff, c.cfg.Kafka.RetryMaxBackoffMs)
+				continue
+			} else {
+				continue
 			}
-			if !c.retryAfterFetchFailure(ctx, err, backoff) {
+		}
+
+		if !processed {
+			if err := c.process(ctx, pending); err != nil {
+				c.logProcessFailure(len(pending), err)
+				if !c.sleep(ctx, backoff) {
+					return nil
+				}
+				backoff = nextBackoff(backoff, c.cfg.Kafka.RetryMaxBackoffMs)
+				continue
+			}
+			processed = true
+		}
+
+		if !c.commit(ctx, pending) {
+			if !c.sleep(ctx, backoff) {
 				return nil
 			}
 			backoff = nextBackoff(backoff, c.cfg.Kafka.RetryMaxBackoffMs)
 			continue
 		}
-		if len(batch) == 0 {
-			continue
-		}
-
+		c.logBatchCommitted(len(pending))
+		pending = nil
+		processed = false
 		backoff = time.Second
-		if err := c.process(ctx, batch); err != nil {
-			c.logProcessFailure(len(batch), err)
-			if !c.sleep(ctx, backoff) {
-				return nil
-			}
-			continue
-		}
-
-		if !c.commit(ctx, batch) {
-			continue
-		}
-		c.logBatchCommitted(len(batch))
 	}
 }
 
@@ -173,7 +200,7 @@ func (c *Consumer) fetchBatch(ctx context.Context) ([]kafka.Message, error) {
 			if errors.Is(err, context.DeadlineExceeded) {
 				break
 			}
-			return nil, fmt.Errorf("拉取后续消息失败: %w", err)
+			return batch, fmt.Errorf("拉取后续消息失败: %w", err)
 		}
 		batch = append(batch, msg)
 	}
@@ -183,26 +210,35 @@ func (c *Consumer) fetchBatch(ctx context.Context) ([]kafka.Message, error) {
 // process 将批次解析为审计记录并批量入库。
 // 单条消息解析失败只走死信, 不影响整批提交; 入库失败才整体返回错误。
 func (c *Consumer) process(ctx context.Context, batch []kafka.Message) error {
-	records := c.buildRecords(batch)
+	records, err := c.buildRecords(batch)
+	if err != nil {
+		return err
+	}
 	if len(records) == 0 {
 		return nil
 	}
 	return c.persistRecords(ctx, records)
 }
 
-func (c *Consumer) buildRecords(batch []kafka.Message) []*mapper.Record {
+func (c *Consumer) buildRecords(batch []kafka.Message) ([]*mapper.Record, error) {
 	records := make([]*mapper.Record, 0)
 	for _, msg := range batch {
-		records = append(records, c.buildMessageRecords(msg)...)
+		rs, err := c.buildMessageRecords(msg)
+		if err != nil {
+			return nil, err
+		}
+		records = append(records, rs...)
 	}
-	return records
+	return records, nil
 }
 
-func (c *Consumer) buildMessageRecords(msg kafka.Message) []*mapper.Record {
+func (c *Consumer) buildMessageRecords(msg kafka.Message) ([]*mapper.Record, error) {
 	flats, err := canal.DecodeValue(msg.Value)
 	if err != nil {
-		c.dead.Write(msg, err)
-		return nil
+		if deadErr := c.dead.Write(msg, err); deadErr != nil {
+			return nil, fmt.Errorf("写入解析失败死信失败: %w", deadErr)
+		}
+		return nil, nil
 	}
 
 	records := make([]*mapper.Record, 0)
@@ -212,12 +248,14 @@ func (c *Consumer) buildMessageRecords(msg kafka.Message) []*mapper.Record {
 		}
 		rs, err := c.mapper.Build(flat)
 		if err != nil {
-			c.dead.Write(msg, err)
+			if deadErr := c.dead.Write(msg, err); deadErr != nil {
+				return nil, fmt.Errorf("写入映射失败死信失败: %w", deadErr)
+			}
 			continue
 		}
 		records = append(records, rs...)
 	}
-	return records
+	return records, nil
 }
 
 func isAuditable(flat *canal.FlatMessage) bool {
@@ -225,16 +263,10 @@ func isAuditable(flat *canal.FlatMessage) bool {
 }
 
 func (c *Consumer) persistRecords(ctx context.Context, records []*mapper.Record) error {
-	skipped, err := c.store.BatchInsert(ctx, records)
-	if err != nil {
+	if err := c.store.BatchInsert(ctx, records); err != nil {
 		return err
 	}
-	if skipped > 0 {
-		c.log.Warn("部分审计记录因记录级错误被跳过(操作人已删除/字段超长等)",
-			zap.Int("skipped", skipped))
-	}
-	c.log.Info("审计记录入库",
-		zap.Int("batch", len(records)), zap.Int("skipped", skipped))
+	c.log.Info("审计记录入库", zap.Int("batch", len(records)))
 	return nil
 }
 

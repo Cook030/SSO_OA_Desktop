@@ -10,8 +10,9 @@ import (
 
 // TableMapping 单表审计映射(来自配置 mapping 段)。
 type TableMapping struct {
-	TargetType string `mapstructure:"target_type"`
-	Key        string `mapstructure:"key"`
+	TargetType string            `mapstructure:"target_type"`
+	Key        string            `mapstructure:"key"`
+	Actions    map[string]string `mapstructure:"actions"`
 }
 
 // Record 一条待落库的审计记录。
@@ -29,13 +30,19 @@ type Record struct {
 
 // Mapper 负责 binlog 行 -> 审计记录 的语义映射。
 type Mapper struct {
-	tables map[string]TableMapping
-	san    *sanitize.Sanitizer
+	tables   map[string]TableMapping
+	san      *sanitize.Sanitizer
+	sourceID string
 }
 
 // New 构造 Mapper。
 func New(tables map[string]TableMapping, san *sanitize.Sanitizer) *Mapper {
-	return &Mapper{tables: tables, san: san}
+	return NewWithSource(tables, san, "")
+}
+
+// NewWithSource 构造携带稳定数据源标识的 Mapper，用于跨主库切换时保持幂等键隔离。
+func NewWithSource(tables map[string]TableMapping, san *sanitize.Sanitizer, sourceID string) *Mapper {
+	return &Mapper{tables: tables, san: san, sourceID: sourceID}
 }
 
 // Build 将一条 DML 事件映射为 0..n 条记录(多行事件每行一条)。
@@ -71,7 +78,7 @@ func (m *Mapper) buildRowRecord(flat *canal.FlatMessage, tm TableMapping, idx in
 		Detail:     detail,
 		BeforeData: beforeData,
 		RequestID:  nonEmptyPtr(row["request_id"]),
-		DedupKey:   dedupKey(flat, idx),
+		DedupKey:   dedupKey(flat, idx, m.sourceID),
 		EventTime:  eventTimeOf(flat, row),
 	}
 }

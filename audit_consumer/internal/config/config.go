@@ -41,6 +41,7 @@ func (k KafkaConfig) FlushInterval() time.Duration {
 
 // MySQLConfig 审计库(sys_audit_log)连接配置。
 type MySQLConfig struct {
+	SourceID     string `mapstructure:"source_id"`
 	Host         string
 	Port         int
 	Username     string
@@ -163,11 +164,19 @@ func (c *Config) validate() error {
 	if c.MySQL.Host == "" {
 		return fmt.Errorf("配置缺失: mysql.host 不能为空")
 	}
+	if c.MySQL.SourceID == "" {
+		return fmt.Errorf("配置缺失: mysql.source_id 不能为空")
+	}
 	if c.MySQL.Database == "" {
 		return fmt.Errorf("配置缺失: mysql.database 不能为空")
 	}
 	if len(c.Mapping) == 0 {
 		return fmt.Errorf("配置缺失: mapping 未配置任何审计表")
+	}
+	for table, mapping := range c.Mapping {
+		if mapping.TargetType == "" || mapping.Key == "" {
+			return fmt.Errorf("配置错误: mapping.%s 的 target_type 与 key 不能为空", table)
+		}
 	}
 	return nil
 }

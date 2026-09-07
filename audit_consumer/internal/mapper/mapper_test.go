@@ -12,9 +12,12 @@ import (
 
 func newTestMapper() *mapper.Mapper {
 	tables := map[string]mapper.TableMapping{
-		"sys_user":      {TargetType: "user", Key: "id"},
-		"sys_role":      {TargetType: "role", Key: "id"},
-		"sys_user_role": {TargetType: "user", Key: "user_id"},
+		"sys_user": {TargetType: "user", Key: "id"},
+		"sys_role": {TargetType: "role", Key: "id"},
+		"sys_user_role": {
+			TargetType: "user", Key: "user_id",
+			Actions: map[string]string{"INSERT": "user:assign-role"},
+		},
 	}
 	return mapper.New(tables, sanitize.New([]string{"password", "password_hash"}, "******"))
 }
@@ -26,13 +29,13 @@ func sp(s string) *string { return &s }
 // 此处仅给变更列以覆盖 mapper 反推 before 的路径)。位点来自 Entry.header。
 func updateFlat() *canal.FlatMessage {
 	return &canal.FlatMessage{
-		Database:        "sso",
-		Table:           "sys_user",
-		Type:            "UPDATE",
-		ES:              1757059200000,
-		BinlogFileName:  "mysql-bin.000001",
-		BinlogPosition:  500,
-		GTID:            "abcdef:1-10",
+		Database:       "sso",
+		Table:          "sys_user",
+		Type:           "UPDATE",
+		ES:             1757059200000,
+		BinlogFileName: "mysql-bin.000001",
+		BinlogPosition: 500,
+		GTID:           "abcdef:1-10",
 		Data: []map[string]*string{{
 			"id": sp("1"), "account": sp("admin"), "password": sp("hash-new"),
 			"name": sp("管理员"), "updated_by": sp("9"), "request_id": sp("req-123"),
@@ -103,12 +106,12 @@ func TestBuildUpdate(t *testing.T) {
 func TestBuildInsertJoinTable(t *testing.T) {
 	m := newTestMapper()
 	flat := &canal.FlatMessage{
-		Database:        "sso",
-		Table:           "sys_user_role",
-		Type:            "INSERT",
-		ES:              1757059200000,
-		BinlogFileName:  "mysql-bin.000002",
-		BinlogPosition:  10,
+		Database:       "sso",
+		Table:          "sys_user_role",
+		Type:           "INSERT",
+		ES:             1757059200000,
+		BinlogFileName: "mysql-bin.000002",
+		BinlogPosition: 10,
 		Data: []map[string]*string{{
 			"id": sp("88"), "user_id": sp("3"), "role_id": sp("7"),
 			"created_by": sp("2"), "request_id": sp("r1"),
@@ -136,13 +139,13 @@ func TestBuildInsertJoinTable(t *testing.T) {
 func TestBuildUnmappedTable(t *testing.T) {
 	m := newTestMapper()
 	flat := &canal.FlatMessage{
-		Database:        "sso",
-		Table:           "sys_audit_log",
-		Type:            "INSERT",
-		ES:              1757059200000,
-		BinlogFileName:  "mysql-bin.000003",
-		BinlogPosition:  1,
-		Data:            []map[string]*string{{"id": sp("1")}},
+		Database:       "sso",
+		Table:          "sys_audit_log",
+		Type:           "INSERT",
+		ES:             1757059200000,
+		BinlogFileName: "mysql-bin.000003",
+		BinlogPosition: 1,
+		Data:           []map[string]*string{{"id": sp("1")}},
 	}
 	records, err := m.Build(flat)
 	if err != nil {

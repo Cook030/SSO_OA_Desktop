@@ -1,6 +1,9 @@
 package consumer
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -40,17 +43,14 @@ func NewDeadLetter(cfg config.DeadLetterConfig, log *zap.Logger) *DeadLetter {
 	}
 }
 
-// Write 将失败消息追加到当日死信文件, 随后清理超出上限的最旧文件。
-func (d *DeadLetter) Write(msg kafka.Message, reason error) {
+// Write 将失败消息的可定位元数据追加到当日死信文件, 随后清理超出上限的最旧文件。
+// 不落盘原始载荷，避免 Canal 消息中的敏感列绕过脱敏规则。
+func (d *DeadLetter) Write(msg kafka.Message, reason error) error {
 	if d.dir == "" {
-		d.log.Error("丢弃无法解析的Kafka消息(未配置死信目录)",
-			zap.Int("partition", msg.Partition), zap.Int64("offset", msg.Offset),
-			zap.Error(reason))
-		return
+		return errors.New("未配置死信目录")
 	}
 	if err := os.MkdirAll(d.dir, 0o755); err != nil {
-		d.log.Error("创建死信目录失败", zap.String("dir", d.dir), zap.Error(err))
-		return
+		return fmt.Errorf("创建死信目录(%s)失败: %w", d.dir, err)
 	}
 	day := time.Now()
 	name := filepath.Join(d.dir, day.Format("20060102")+deadLetterExt)
@@ -60,18 +60,41 @@ func (d *DeadLetter) Write(msg kafka.Message, reason error) {
 
 	f, err := os.OpenFile(name, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
-		d.log.Error("打开死信文件失败", zap.String("file", name), zap.Error(err))
-		return
+		return fmt.Errorf("打开死信文件(%s)失败: %w", name, err)
 	}
-	defer f.Close()
-	line := fmt.Sprintf("%s\ttopic=%s\tpartition=%d\toffset=%d\terror=%s\tvalue=%s\n",
-		day.Format(time.RFC3339), msg.Topic, msg.Partition, msg.Offset,
-		reason, string(msg.Value))
-	if _, err := f.WriteString(line); err != nil {
-		d.log.Error("写入死信文件失败", zap.String("file", name), zap.Error(err))
-		return
+	sum := sha256.Sum256(msg.Value)
+	line, err := json.Marshal(deadLetterEntry{
+		Time:          day.Format(time.RFC3339),
+		Topic:         msg.Topic,
+		Partition:     msg.Partition,
+		Offset:        msg.Offset,
+		Reason:        reason.Error(),
+		PayloadSHA256: hex.EncodeToString(sum[:]),
+		PayloadBytes:  len(msg.Value),
+	})
+	if err != nil {
+		_ = f.Close()
+		return fmt.Errorf("编码死信记录失败: %w", err)
+	}
+	if _, err := f.Write(append(line, '\n')); err != nil {
+		_ = f.Close()
+		return fmt.Errorf("写入死信文件(%s)失败: %w", name, err)
+	}
+	if err := f.Close(); err != nil {
+		return fmt.Errorf("关闭死信文件(%s)失败: %w", name, err)
 	}
 	d.trim(day)
+	return nil
+}
+
+type deadLetterEntry struct {
+	Time          string `json:"time"`
+	Topic         string `json:"topic"`
+	Partition     int    `json:"partition"`
+	Offset        int64  `json:"offset"`
+	Reason        string `json:"reason"`
+	PayloadSHA256 string `json:"payload_sha256"`
+	PayloadBytes  int    `json:"payload_bytes"`
 }
 
 // trim 从最旧的死信文件开始删除, 直到文件数与总大小都不超上限。

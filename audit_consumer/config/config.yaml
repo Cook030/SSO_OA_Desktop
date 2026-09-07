@@ -14,6 +14,8 @@ kafka:
   retry_max_backoff_ms: 30000
 
 mysql:
+  # 稳定且全局唯一的 MySQL 数据源标识；主从切换时保持不变，不同集群不得复用。
+  source_id: "oa-manage-primary"
   host: "127.0.0.1"
   port: 3306
   username: "root"
@@ -33,16 +35,24 @@ sanitize:
   replacement: "******"
 
 # 表 -> target_type / 主键列(用于 target_id)
-# 非关联表 action = <target_type>:create|update|delete
-# 关联表(user_role 等)在代码中映射为 assign-role/unassign-role 语义
+# 未指定 actions 时，action = <target_type>:create|update|delete
 mapping:
   sys_user:            { target_type: user,       key: id }
   sys_platform:        { target_type: platform,   key: id }
   sys_role:            { target_type: role,       key: id }
   sys_permission:      { target_type: permission, key: id }
-  sys_user_role:       { target_type: user,       key: user_id }
-  sys_role_permission: { target_type: role,       key: role_id }
-  sys_user_platform:   { target_type: user,       key: user_id }
+  sys_user_role:
+    target_type: user
+    key: user_id
+    actions: { INSERT: "user:assign-role", UPDATE: "user:update", DELETE: "user:unassign-role" }
+  sys_role_permission:
+    target_type: role
+    key: role_id
+    actions: { INSERT: "role:assign-permission", UPDATE: "role:update", DELETE: "role:unassign-permission" }
+  sys_user_platform:
+    target_type: user
+    key: user_id
+    actions: { INSERT: "user:assign-platform", UPDATE: "user:update", DELETE: "user:unassign-platform" }
 
 # 死信落盘: 无法解析/映射的消息写本地文件, 便于人工核查与按 offset 补采
 # 上限超出时自动删除最旧文件; 0 或未配置 = 使用默认值, 负数 = 不限制

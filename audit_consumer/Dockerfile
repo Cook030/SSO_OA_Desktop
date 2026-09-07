@@ -16,7 +16,7 @@ RUN apk add --no-cache ca-certificates tzdata
 
 WORKDIR /app
 COPY --from=builder /out/audit-consumer /usr/local/bin/audit-consumer
-COPY config/config.example.yaml ./config/config.yaml
+COPY config/config.yaml ./config/config.yaml
 
 EXPOSE 8080
 ENTRYPOINT ["audit-consumer", "-c", "config/config.yaml"]

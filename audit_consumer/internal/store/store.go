@@ -4,12 +4,9 @@ package store
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
-
-	"github.com/go-sql-driver/mysql"
 
 	"mh-audit-consumer/internal/mapper"
 )
@@ -19,10 +16,10 @@ const (
 	(operator_id, action, target_type, target_id, detail, before_data, source, dedup_key, request_id, create_time)
 	VALUES `
 	rowValues = "(?, ?, ?, ?, ?, ?, 1, ?, ?, ?)"
-	//消费者是at-least-once的，即消息至少被处理一次
-	//使用dedup_key这一组合字段保证唯一
-	//当执行INSERT违反了唯一索引dedup_key，MySQL不会报错，而是转成UPDATE
-	//只处理唯一键冲突，更新dedup_key，其他错误正常抛出
+	// 消费者是at-least-once的即消息至少被处理一次
+	// 只处理唯一键冲突，更新dedup_key，其他错误正常抛出
+	// 使用 dedup_key 唯一索引保证消息重放时幂等。
+	// 当执行INSERT违反了唯一索引dedup_key时，MySQL不会报错，而是转成UPDATE
 	onDupNoop = " ON DUPLICATE KEY UPDATE dedup_key = dedup_key"
 )
 
@@ -31,18 +28,6 @@ const argsPerRow = 9
 
 // maxRowsPerStmt 单条 INSERT 的最大行数。
 const maxRowsPerStmt = 500
-
-// singleRowStmt 单条插入语句, 逐条回退时使用; 固定字符串可命中 database/sql 的 stmt 缓存。
-var singleRowStmt = insertPrefix + rowValues + onDupNoop
-
-// 记录级错误码: 这类错误说明"该行本身写不进去", 重试无意义, 只能跳过该行;
-// 其余错误(连接中断、死锁 1213、锁等待超时 1205 等)必须整批重试, 不能静默丢数据。
-const (
-	errDupEntry       = 1062 // 唯一键冲突(兜底; 正常已由 ON DUPLICATE KEY UPDATE 消化)
-	errBadNull        = 1048 // 非空列收到 NULL
-	errNoFKReferenced = 1452 // 外键不存在: operator_id 引用的用户已被物理删除
-	errDataTooLong    = 1406 // 字段超长: detail/before_data 超出列容量
-)
 
 // Store 审计库写入器。
 type Store struct {
@@ -73,31 +58,21 @@ func (s *Store) Close() error {
 	return s.db.Close()
 }
 
-// BatchInsert 批量插入审计记录。
-// 返回 skipped: 因记录级错误(操作人已删除/字段超长等)被跳过的记录数; 批量语句命中记录级错误时回退逐条插入。
-func (s *Store) BatchInsert(ctx context.Context, records []*mapper.Record) (int, error) {
+// BatchInsert 批量插入审计记录。任一写入错误都返回上层并阻止提交 offset，
+// 以避免审计记录被静默丢弃；重试产生的重复记录由 dedup_key 吸收。
+func (s *Store) BatchInsert(ctx context.Context, records []*mapper.Record) error {
 	if len(records) == 0 {
-		return 0, nil
+		return nil
 	}
-	skipped := 0
 	for start := 0; start < len(records); start += maxRowsPerStmt {
 		end := min(start+maxRowsPerStmt, len(records))
 		chunk := records[start:end]
 
-		err := s.insertBatch(ctx, chunk)
-		if err == nil {
-			continue
-		}
-		if !isRecordLevelError(err) {
-			return skipped, fmt.Errorf("批量写入审计日志失败: %w", err)
-		}
-		n, err := s.insertOneByOne(ctx, chunk)
-		skipped += n
-		if err != nil {
-			return skipped, err
+		if err := s.insertBatch(ctx, chunk); err != nil {
+			return fmt.Errorf("批量写入审计日志失败: %w", err)
 		}
 	}
-	return skipped, nil
+	return nil
 }
 
 func (s *Store) insertBatch(ctx context.Context, records []*mapper.Record) error {
@@ -129,33 +104,6 @@ func batchArgs(records []*mapper.Record) []any {
 	return args
 }
 
-// insertOneByOne 逐条插入并隔离问题行(单条语句原子, 记录级错误跳过该行后继续)。
-func (s *Store) insertOneByOne(ctx context.Context, records []*mapper.Record) (int, error) {
-	skipped := 0
-	for _, record := range records {
-		wasSkipped, err := s.insertOne(ctx, record)
-		if err != nil {
-			return skipped, err
-		}
-		if wasSkipped {
-			skipped++
-		}
-	}
-	return skipped, nil
-}
-
-// insertOne 返回该记录是否因记录级错误被跳过。
-func (s *Store) insertOne(ctx context.Context, record *mapper.Record) (bool, error) {
-	_, err := s.db.ExecContext(ctx, singleRowStmt, insertArgs(record)...)
-	if err == nil {
-		return false, nil
-	}
-	if isRecordLevelError(err) {
-		return true, nil
-	}
-	return false, fmt.Errorf("单条写入审计日志失败: %w", err)
-}
-
 // insertArgs 组装单条记录参数, 与 rowValues 的 9 个占位符一一对应。
 func insertArgs(r *mapper.Record) []any {
 	event := time.Now()
@@ -172,19 +120,5 @@ func insertArgs(r *mapper.Record) []any {
 		r.DedupKey,
 		r.RequestID,
 		event,
-	}
-}
-
-// isRecordLevelError 判断错误是否只影响当前行。
-func isRecordLevelError(err error) bool {
-	var me *mysql.MySQLError
-	if !errors.As(err, &me) {
-		return false
-	}
-	switch me.Number {
-	case errDupEntry, errBadNull, errNoFKReferenced, errDataTooLong:
-		return true
-	default:
-		return false
 	}
 }

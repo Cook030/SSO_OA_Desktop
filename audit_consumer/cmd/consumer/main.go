@@ -23,13 +23,12 @@ func main() {
 	configPath := flag.String("c", "config/config.yaml", "配置文件路径")
 	flag.Parse()
 
-	logger := newLogger()
-	defer func() { _ = logger.Sync() }()
-
 	cfg, err := config.Load(*configPath)
 	if err != nil {
-		logger.Fatal("加载配置失败", zap.Error(err))
+		newLogger("info").Fatal("加载配置失败", zap.Error(err))
 	}
+	logger := newLogger(effectiveLogLevel(cfg.Log.Level))
+	defer func() { _ = logger.Sync() }()
 
 	st, err := store.New(cfg.MySQL.DSN(), cfg.MySQL.MaxOpenConns, cfg.MySQL.MaxIdleConns)
 	if err != nil {
@@ -37,7 +36,7 @@ func main() {
 	}
 	defer func() { _ = st.Close() }()
 
-	mp := mapper.New(cfg.Mapping, sanitize.New(cfg.Sanitize.Fields, cfg.Sanitize.Replacement))
+	mp := mapper.NewWithSource(cfg.Mapping, sanitize.New(cfg.Sanitize.Fields, cfg.Sanitize.Replacement), cfg.MySQL.SourceID)
 	cons := consumer.New(cfg, st, mp, logger)
 	defer func() { _ = cons.Close() }()
 
@@ -51,12 +50,8 @@ func main() {
 	logger.Info("audit-consumer 已退出")
 }
 
-// newLogger 根据 AUDIT_LOG_LEVEL 构建 zap 日志(默认 info)。
-func newLogger() *zap.Logger {
-	level := os.Getenv("AUDIT_LOG_LEVEL")
-	if level == "" {
-		level = "info"
-	}
+// newLogger 根据指定级别构建 zap 日志。
+func newLogger(level string) *zap.Logger {
 	cfg := zap.NewProductionConfig()
 	if err := cfg.Level.UnmarshalText([]byte(level)); err != nil {
 		cfg.Level = zap.NewAtomicLevelAt(zap.InfoLevel)
@@ -68,4 +63,12 @@ func newLogger() *zap.Logger {
 		os.Exit(1)
 	}
 	return logger
+}
+
+// 环境变量优先于配置文件，便于容器部署时临时调高日志级别。
+func effectiveLogLevel(configLevel string) string {
+	if envLevel := os.Getenv("AUDIT_LOG_LEVEL"); envLevel != "" {
+		return envLevel
+	}
+	return configLevel
 }
