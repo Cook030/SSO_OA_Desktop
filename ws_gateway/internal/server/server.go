@@ -1,6 +1,6 @@
 // Package server 提供 WebSocket 握手入口。
 //
-// 职责边界（dev.md §4）：Gateway 只负责连接管理与事件投递，
+// 职责边界：Gateway 只负责连接管理与事件投递，
 // 会话是否有效的判定完全交给 SSO 的内部 introspect 接口。
 // Gateway 不持有 JWT 密钥、不连接用户数据库、不修改任何登录状态。
 package server
@@ -88,7 +88,7 @@ func (s *Server) HandleWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 1. 提取 access token：浏览器走 Cookie（dev.md §5 明确禁止放在 URL query 中）
+	// 1. 提取 access token：浏览器走 Cookie，禁止从 URL query 读取凭证。
 	accessToken := s.extractAccessToken(r)
 	if accessToken == "" {
 		writeErr(w, http.StatusUnauthorized, "缺少 access token", "TOKEN_MISSING")
@@ -203,7 +203,7 @@ func (s *Server) replayPending(ctx context.Context, c *wsconn.Connection, sessio
 }
 
 // extractAccessToken 按 Cookie → Authorization 的顺序提取 access token。
-// dev.md §5：不读取 URL query 参数中的 token，避免泄漏到日志与 Referer。
+// 不读取 URL query 参数中的 token，避免泄漏到日志与 Referer。
 func (s *Server) extractAccessToken(r *http.Request) string {
 	if cookie, err := r.Cookie(s.cfg.Realtime.AccessTokenCookieName); err == nil && cookie.Value != "" {
 		return cookie.Value

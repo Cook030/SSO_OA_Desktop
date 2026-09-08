@@ -15,7 +15,7 @@ import (
 
 // ValidateAccessToken 完整校验 access token
 //
-// 单设备登录的校验要求（dev.md §1）：
+// 单设备登录的校验要求：
 //
 //	JWT 签名与过期时间合法
 //	AND JWT.sessionId == sso:user:{userId}:current_session

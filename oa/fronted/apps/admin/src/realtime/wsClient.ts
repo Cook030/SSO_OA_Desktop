@@ -21,7 +21,7 @@ export interface RealtimeClientOptions {
   onStatusChange?: (status: ConnectionStatus) => void;
   /** 退避重连基础间隔 */
   baseDelayMs?: number;
-  /** 退避重连最大间隔（dev.md §2 要求最大 30 秒） */
+  /** 退避重连最大间隔。 */
   maxDelayMs?: number;
   /** 幂等记录条数上限，超出后淘汰最早记录 */
   maxTrackedEventIds?: number;
@@ -47,7 +47,7 @@ export class RealtimeClient {
   private sessionEnded = false;
   private attempt = 0;
   private reconnectTimer: number | null = null;
-  /** 已处理事件 ID：保证同一事件重复投递只执行一次（dev.md §3） */
+  /** 已处理事件 ID：保证同一事件重复投递只执行一次。 */
   private readonly processedEventIds = new Set<string>();
   private readonly processedOrder: string[] = [];
 

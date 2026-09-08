@@ -123,14 +123,14 @@ func (c *Config) applyDefaults() {
 	if c.Realtime.AccessTokenCookieName == "" {
 		c.Realtime.AccessTokenCookieName = "mh_sso_access_token"
 	}
-	// dev.md §2：服务端每 25 秒 Ping，45 秒未收到 Pong 关闭连接
+	// 服务端每 25 秒 Ping；45 秒未收到 Pong 即关闭半开连接。
 	if c.Realtime.PingIntervalSecond == 0 {
 		c.Realtime.PingIntervalSecond = 25
 	}
 	if c.Realtime.PongWaitSecond == 0 {
 		c.Realtime.PongWaitSecond = 45
 	}
-	// dev.md §2：写队列上限 128
+	// 写队列上限用于限制慢客户端的内存占用。
 	if c.Realtime.WriteQueueSize == 0 {
 		c.Realtime.WriteQueueSize = 128
 	}

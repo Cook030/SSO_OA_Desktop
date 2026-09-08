@@ -61,8 +61,7 @@ func SetupRouter(db *gorm.DB, rdb *cache.Cache, cfg *utils.Config) *gin.Engine {
 		}
 
 		// 供业务后端调用的服务接口。
-		// 注意：按 dev.md §4，本接口不应作为公开接口对外暴露；
-		// 内部调用方应改用下方 /internal/v1 下带服务间鉴权的接口，此处保留仅为兼容既有调用方。
+		// 此兼容接口仅校验传入 token；服务间调用应使用下方受服务间鉴权保护的内部接口。
 		auth.GET("/introspect", authHandler.Introspect)
 	}
 

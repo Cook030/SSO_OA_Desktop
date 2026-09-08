@@ -1,5 +1,5 @@
 /**
- * 前端与 WebSocket Gateway 的最小协议（dev.md §5）。
+ * 前端与 WebSocket Gateway 的最小协议。
  * 常量与 ws_gateway/internal/protocol 保持一致，修改需同步。
  */
 

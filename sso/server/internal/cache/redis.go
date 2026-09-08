@@ -259,7 +259,7 @@ func userSessionKey(userID uint64) string {
 	return "sso:user_sessions:" + strconv.FormatUint(userID, 10)
 }
 
-// currentSessionKey 用户唯一有效会话（dev.md §1：sso:user:{userId}:current_session）。
+// currentSessionKey 用户唯一有效会话：sso:user:{userId}:current_session。
 // 用户会话集合沿用历史键 sso:user_sessions:{userId}，无需数据迁移。
 func currentSessionKey(userID uint64) string {
 	return "sso:user:" + strconv.FormatUint(userID, 10) + ":current_session"

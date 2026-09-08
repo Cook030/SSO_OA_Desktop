@@ -1,8 +1,8 @@
 // Package protocol 定义 WebSocket Gateway 与浏览器、以及与 SSO 之间的通信契约。
 //
-// 契约以 dev.md 第 3/5 节为准；SSO 侧（sso/server/internal/consts/realtime.go）
-// 保存同一套 Redis 常量。Gateway 与 SSO 是独立部署的服务，不共享 Go 包，
-// 因此常量以副本形式存在，修改时必须同步两侧与 dev.md。
+// SSO 侧（sso/server/internal/consts/realtime.go）保存同一套 Redis 常量。
+// Gateway 与 SSO 是独立部署的服务，不共享 Go 包，因此常量以副本形式存在，
+// 修改时必须同步两侧。
 package protocol
 
 import "errors"
@@ -46,5 +46,5 @@ const (
 
 // ErrQueueFull 连接写队列已满。
 // 普通通知可以丢弃或合并，但 session_replaced 这类关键事件不能静默丢弃，
-// 调用方收到本错误时应关闭该连接（dev.md §2）。
+// 调用方收到本错误时应关闭该连接，避免关键事件被静默丢弃。
 var ErrQueueFull = errors.New("realtime: 写队列已满")

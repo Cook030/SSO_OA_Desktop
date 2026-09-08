@@ -1,6 +1,6 @@
 // Package stream 消费 SSO 写入 Redis Stream 的会话事件，并投递给本机连接。
 //
-// 可靠性（dev.md §3）：
+// 可靠性保证：
 //   - 使用 Consumer Group：Gateway 崩溃时未确认的消息留在 PEL，
 //     可由本实例恢复，或其他实例通过 XAUTOCLAIM 接管，不会丢消息；
 //   - 投递顺序固定为：写 sso:delivery → XACK → 推给连接。

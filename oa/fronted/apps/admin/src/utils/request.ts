@@ -68,7 +68,7 @@ request.interceptors.response.use(
       return data;
     }
 
-    // 会话已被顶下线：刷新必然失败，直接走下线流程（dev.md §2 场景三）
+    // 会话已被顶下线：刷新必然失败，直接走下线流程。
     if (isSessionReplacedResponse(response.data)) {
       handleSessionEnded(response.data?.reason);
       return Promise.reject(new Error("账号已在其他设备登录"));

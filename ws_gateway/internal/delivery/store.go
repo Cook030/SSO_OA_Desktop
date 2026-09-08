@@ -1,6 +1,6 @@
 // Package delivery 管理"至少一次投递"语义下的待确认消息。
 //
-// 流程（dev.md §3）：
+// 投递流程：
 //
 //	Gateway 收到 Stream 事件 → 先 HSET 到 sso:delivery:{sessionId} → 再 XACK
 //	→ 推给连接 → 客户端回 ack → HDEL

@@ -20,7 +20,7 @@ import (
 // "事件已写但状态未变"（旧 access token 仍然可用）的半成功状态。
 //
 // 采用 Redis Lua 单脚本实现：Redis 单线程执行脚本，脚本内任一步失败整体回滚。
-// 这也是 dev.md 明确不使用 Redis Cluster 的原因 —— 跨 slot 脚本会破坏原子性。
+// 因此该会话模型要求所有相关键位于同一 Redis 主节点；跨 slot 脚本会破坏原子性。
 //
 // 脚本内需要按 sessionId / tokenHash 动态拼键，故通过 fmt.Sprintf 注入
 // redis.go 中定义的键前缀，保证 Go 侧与 Lua 侧的键名一致。

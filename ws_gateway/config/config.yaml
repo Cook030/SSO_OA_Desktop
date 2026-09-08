@@ -12,7 +12,7 @@ redis:
   pool_size: 50
 
 sso:
-  # Gateway → SSO 的内部鉴权接口（dev.md §4）
+  # Gateway → SSO 的内部鉴权接口
   introspect_url: "http://127.0.0.1:8081/internal/v1/sessions/introspect"
   # 必须与 SSO 的 internal.service_token 一致
   service_token: "dev-only-internal-token-change-me"
@@ -26,7 +26,7 @@ realtime:
     - "http://localhost:8004"
   access_token_cookie_name: "mh_sso_access_token"
 
-  # dev.md §2：服务端每 25 秒 Ping，45 秒未收到 Pong 则关闭连接
+  # 服务端每 25 秒 Ping，45 秒未收到 Pong 则关闭连接
   ping_interval_second: 25
   pong_wait_second: 45
   # 写队列上限：满时普通消息丢弃，关键事件则关闭连接

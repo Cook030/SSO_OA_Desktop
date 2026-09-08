@@ -2,9 +2,8 @@ package consts
 
 // 本文件定义 SSO 与 WebSocket Gateway 之间的实时事件契约（会话下线通知）。
 //
-// 契约以 dev.md 第 3 节为准，WebSocket Gateway 侧（ws_gateway/internal/protocol/contract.go）
-// 保存同一套常量。两侧是独立部署的服务，不共享 Go 包，因此常量以副本形式存在；
-// 修改任一处必须同步另一处与 dev.md。
+// WebSocket Gateway 侧（ws_gateway/internal/protocol/contract.go）保存同一套常量。
+// 两侧是独立部署的服务，不共享 Go 包，因此常量以副本形式存在；修改任一处必须同步另一处。
 
 // Redis Key / Stream 契约
 const (

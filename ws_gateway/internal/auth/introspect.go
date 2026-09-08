@@ -1,7 +1,7 @@
 // Package auth 封装对 SSO 内部鉴权接口的调用。
 //
 // Gateway 自身不持有 JWT 密钥、不连接用户数据库，也不判断"会话该不该失效"：
-// 它只把浏览器带来的 access token 转给 SSO，并接受 SSO 的结论（dev.md §4）。
+// 它只把浏览器带来的 access token 转给 SSO，并接受 SSO 的会话判定结果。
 package auth
 
 import (

@@ -2,7 +2,7 @@ package protocol
 
 import "encoding/json"
 
-// ServerMessage 服务端 → 客户端的消息（dev.md §5 最小协议）。
+// ServerMessage 服务端 → 客户端的最小实时消息协议。
 // 只保留两类：事件推送（event）与未来扩展用的业务消息。
 type ServerMessage struct {
 	Type      string `json:"type"`                // "event"
