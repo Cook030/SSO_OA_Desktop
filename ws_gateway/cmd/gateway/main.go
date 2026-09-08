@@ -85,8 +85,10 @@ func main() {
 	)
 
 	consumer := stream.NewConsumer(rdb, stream.Options{
-		StreamKey:       protocol.SessionEventStreamKey,
-		Group:           cfg.Realtime.ConsumerGroup,
+		StreamKey: protocol.SessionEventStreamKey,
+		// 每个实例独立消费同一事件流；共享组会把消息分配给错误实例，
+		// 使真正持有目标连接的 Gateway 无法即时投递。
+		Group:           cfg.Realtime.ConsumerGroup + ":" + instanceID,
 		ConsumerID:      instanceID,
 		BatchSize:       cfg.Realtime.ConsumerBatchSize,
 		Block:           cfg.ConsumerBlock(),

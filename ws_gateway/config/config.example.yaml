@@ -30,6 +30,7 @@ realtime:
   read_limit_bytes: 4096
   max_connections: 10000
 
+  # 程序会自动拼接 :{instance_id}，使每个实例都能消费全部安全事件。
   consumer_group: "ws-gateway"
   consumer_block_ms: 2000
   consumer_batch_size: 64

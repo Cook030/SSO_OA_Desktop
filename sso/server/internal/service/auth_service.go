@@ -90,10 +90,17 @@ func (s *AuthService) Login(ctx context.Context, account, password string, meta 
 	}
 
 	now := time.Now()
+	// 先签发 token；签发失败时不触碰既有会话，避免错误地顶掉旧设备。
+	sessionID := utils.GenerateOpaqueToken("session_")
+	accessToken, _, _, err := s.tokenSvc.GenerateAccessToken(user.ID, sessionID, user.Account, int(user.PasswordVersion), now)
+	if err != nil {
+		return nil, fmt.Errorf("登录签发 access token 失败(uid=%d): %w", user.ID, err)
+	}
 
 	// 4. 建立会话（单设备登录：一次 Lua 原子完成"撤销旧会话 + 写新会话 + 写下线事件"）
 	established, err := s.sessionSvc.EstablishLoginSession(ctx, EstablishSessionInput{
 		User:       user,
+		SessionID:  sessionID,
 		DeviceID:   meta.DeviceID,
 		DeviceType: meta.DeviceType,
 		LoginIP:    meta.IP,
@@ -115,12 +122,6 @@ func (s *AuthService) Login(ctx context.Context, account, password string, meta 
 			consts.ReasonSessionActiveElsewhere)
 	}
 	sessionID, refreshToken := established.SessionID, established.RefreshToken
-
-	// 5. 签发 access token
-	accessToken, _, _, err := s.tokenSvc.GenerateAccessToken(user.ID, sessionID, user.Account, int(user.PasswordVersion), now)
-	if err != nil {
-		return nil, fmt.Errorf("登录签发 access token 失败(uid=%d): %w", user.ID, err)
-	}
 
 	// 6. 登录成功：清理失败计数 + 记审计
 	s.cache.ClearLoginFailures(account)
@@ -265,7 +266,12 @@ func (s *AuthService) Logout(accessToken, refreshToken string, meta RequestMeta)
 		if claims, err := s.tokenSvc.ParseAccessToken(accessToken); err == nil && claims.UserID > 0 {
 			userID = &claims.UserID
 			account = claims.Account
-			s.sessionSvc.revokeSession(claims.SessionID, consts.SessionStatusLoggedOut)
+			if err := s.sessionSvc.revokeSession(context.Background(), claims.UserID, claims.SessionID, consts.SessionStatusLoggedOut, cache.SessionEventInput{
+				EventType: consts.EventTypeSessionTerminated,
+				Reason:    consts.EventReasonLoggedOut,
+			}); err != nil {
+				s.log.Error("登出撤销会话失败", zap.String("session_id", claims.SessionID), zap.Error(err))
+			}
 		}
 	}
 
@@ -277,7 +283,12 @@ func (s *AuthService) Logout(accessToken, refreshToken string, meta RequestMeta)
 					s.log.Error("登出撤销 refresh token 失败", zap.Uint64("user_id", rt.UserID), zap.Error(err))
 				}
 				if userID == nil {
-					s.sessionSvc.revokeSession(rt.SessionID, consts.SessionStatusLoggedOut)
+					if err := s.sessionSvc.revokeSession(context.Background(), rt.UserID, rt.SessionID, consts.SessionStatusLoggedOut, cache.SessionEventInput{
+						EventType: consts.EventTypeSessionTerminated,
+						Reason:    consts.EventReasonLoggedOut,
+					}); err != nil {
+						s.log.Error("登出撤销会话失败", zap.String("session_id", rt.SessionID), zap.Error(err))
+					}
 					userID = &rt.UserID
 				}
 			}

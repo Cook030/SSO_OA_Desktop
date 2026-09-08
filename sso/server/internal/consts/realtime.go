@@ -31,6 +31,8 @@ const (
 	EventReasonReplacedByNewLogin = "replaced_by_new_login"
 	EventReasonPasswordChanged    = "password_changed"
 	EventReasonRevokedByAdmin     = "revoked_by_admin"
+	EventReasonLoggedOut          = "logged_out"
+	EventReasonRefreshReplay      = "refresh_token_replay"
 )
 
 // 对外错误原因码：写入 HTTP 响应体的 reason 字段，供前端区分处理

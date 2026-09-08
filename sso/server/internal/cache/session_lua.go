@@ -247,9 +247,68 @@ end
 return out
 `
 
+// revokeSessionLua 撤销单个会话并写终止事件。它仅在 current_session
+// 恰好是目标 session 时才删除 current_session，因而旧 token 的登出或
+// 重放请求不会误伤后来登录产生的新会话。
+//
+// KEYS: session, token-family, current-session, user-session-index, event-stream
+const revokeSessionLua = `
+local SESSION_PREF = "%s"
+local RT_PREF = "%s"
+local FAMILY_PREF = "%s"
+
+local sid = ARGV[1]
+local sessionStatus = tonumber(ARGV[2])
+local tokenStatus = tonumber(ARGV[3])
+local activeSessionStatus = tonumber(ARGV[4])
+local activeTokenStatus = tonumber(ARGV[5])
+local eventId = ARGV[6]
+local eventType = ARGV[7]
+local reason = ARGV[8]
+local userId = ARGV[9]
+local streamMaxLen = tonumber(ARGV[10])
+local updatedAt = ARGV[11]
+local nowMs = ARGV[12]
+
+local raw = redis.call("GET", KEYS[1])
+if not raw then return 0 end
+local ok, rec = pcall(cjson.decode, raw)
+if not ok or type(rec) ~= "table" or rec["status"] ~= activeSessionStatus then return 0 end
+
+local hashes = redis.call("SMEMBERS", KEYS[2])
+for i = 1, #hashes do
+  local rtRaw = redis.call("GET", RT_PREF .. hashes[i])
+  if rtRaw then
+    local okRt, rt = pcall(cjson.decode, rtRaw)
+    if okRt and type(rt) == "table" and rt["status"] == activeTokenStatus then
+      rt["status"] = tokenStatus
+      rt["updatedAt"] = updatedAt
+      redis.call("SET", RT_PREF .. hashes[i], cjson.encode(rt), "KEEPTTL")
+    end
+  end
+end
+
+rec["status"] = sessionStatus
+rec["updatedAt"] = updatedAt
+redis.call("SET", KEYS[1], cjson.encode(rec), "KEEPTTL")
+if redis.call("GET", KEYS[3]) == sid then
+  redis.call("DEL", KEYS[3])
+end
+redis.call("SREM", KEYS[4], sid)
+redis.call("XADD", KEYS[5], "MAXLEN", "~", streamMaxLen, "*",
+  "eventId", eventId,
+  "type", eventType,
+  "userId", userId,
+  "targetSessionId", sid,
+  "reason", reason,
+  "createdAt", nowMs)
+return 1
+`
+
 var (
-	loginReplaceScript = redis.NewScript(fmt.Sprintf(loginReplaceLua, sessionKeyPrefix, refreshTokenKeyPrefix, sessionTokenKeyPrefix))
-	revokeUserScript   = redis.NewScript(fmt.Sprintf(revokeUserLua, sessionKeyPrefix, refreshTokenKeyPrefix, sessionTokenKeyPrefix))
+	loginReplaceScript  = redis.NewScript(fmt.Sprintf(loginReplaceLua, sessionKeyPrefix, refreshTokenKeyPrefix, sessionTokenKeyPrefix))
+	revokeUserScript    = redis.NewScript(fmt.Sprintf(revokeUserLua, sessionKeyPrefix, refreshTokenKeyPrefix, sessionTokenKeyPrefix))
+	revokeSessionScript = redis.NewScript(fmt.Sprintf(revokeSessionLua, sessionKeyPrefix, refreshTokenKeyPrefix, sessionTokenKeyPrefix))
 )
 
 // SessionEventInput 写入会话事件流的事件描述
@@ -384,6 +443,40 @@ func (c *Cache) RevokeUserSessionsWithEvents(ctx context.Context, userID uint64,
 		return nil, fmt.Errorf("cache: 撤销会话脚本返回结构异常: %v", res)
 	}
 	return toStringSlice(arr, 1)
+}
+
+// RevokeSessionWithEvent 原子撤销一个指定会话、清理其 token，并写入终止事件。
+// 若该 session 已不再 active，返回 false；这保证陈旧凭证不会影响当前会话。
+func (c *Cache) RevokeSessionWithEvent(ctx context.Context, userID uint64, sessionID string, sessionStatus int, ev SessionEventInput) (bool, error) {
+	now := time.Now()
+	keys := []string{
+		sessionKey(sessionID),
+		sessionTokenKey(sessionID),
+		currentSessionKey(userID),
+		userSessionKey(userID),
+		consts.SessionEventStreamKey,
+	}
+	args := []interface{}{
+		sessionID,
+		sessionStatus,
+		consts.RefreshTokenStatusRevoked,
+		consts.SessionStatusActive,
+		consts.RefreshTokenStatusActive,
+		uuid.NewString(),
+		ev.EventType,
+		ev.Reason,
+		strconv.FormatUint(userID, 10),
+		consts.StreamMaxLen,
+		now.Format(time.RFC3339Nano),
+		strconv.FormatInt(now.UnixMilli(), 10),
+	}
+	res, err := revokeSessionScript.Run(ctx, c.rdb, keys, args...).Int64()
+	if err != nil {
+		c.onError("revoke_session_with_event", err)
+		return false, err
+	}
+	c.onOK()
+	return res == 1, nil
 }
 
 // GetCurrentSession 读取用户当前唯一有效会话 ID；不存在返回空字符串

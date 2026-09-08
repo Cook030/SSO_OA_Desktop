@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"mh-sso-svc/internal/cache"
@@ -22,8 +23,8 @@ const (
 // SessionService 负责会话与 refresh token 的创建、校验、轮换与撤销。
 // 核心保证：同一登录/刷新用例内的 Redis 写入要么全部成功、要么整体失败（任一失败返回错误，不产生部分状态）。
 type SessionService struct {
-	cache      *cache.Cache
-	log        *zap.Logger
+	cache       *cache.Cache
+	log         *zap.Logger
 	recordAudit func(userID *uint64, account, eventType string, success bool, failReason string, meta RequestMeta)
 }
 
@@ -46,7 +47,9 @@ func (m *SessionService) audit(userID *uint64, account, eventType string, succes
 
 // EstablishSessionInput 建立登录会话的入参
 type EstablishSessionInput struct {
-	User       *model.SysUser
+	User *model.SysUser
+	// SessionID 由调用方预先生成，先签发 token 后才提交会话置换。
+	SessionID  string
 	DeviceID   string // 已规范化的设备唯一标识
 	DeviceType string
 	LoginIP    string
@@ -76,7 +79,10 @@ type EstablishSessionResult struct {
 // 这样旧客户端即使收不到任何 WebSocket 消息，其 access token 也会在同一次
 // 原子操作后立刻失效；也不会出现"状态变了但事件没写"的半成功状态。
 func (m *SessionService) EstablishLoginSession(ctx context.Context, in EstablishSessionInput) (*EstablishSessionResult, error) {
-	sessionID := utils.GenerateOpaqueToken("session_")
+	if in.SessionID == "" {
+		return nil, fmt.Errorf("session id is required")
+	}
+	sessionID := in.SessionID
 	refreshToken := utils.GenerateOpaqueToken("rt_")
 
 	session := &cache.SessionRecord{
@@ -159,17 +165,17 @@ func (m *SessionService) RotateRefreshToken(oldHash string, userID uint64, sessi
 	return newRefreshToken, nil
 }
 
-// handleRefreshReplay 处理 refresh token 重放：撤销整个 token family 与会话
+// handleRefreshReplay 处理 refresh token 重放：原子撤销会话并写终止事件。
 func (m *SessionService) handleRefreshReplay(rt *cache.RefreshTokenRecord, meta RequestMeta) {
 	m.log.Warn("检测到 refresh token 重放，撤销整个会话",
 		zap.Uint64("user_id", rt.UserID),
 		zap.String("session_id", rt.SessionID),
 		zap.String("request_id", meta.RequestID))
 
-	if err := m.cache.RevokeSessionTokens(rt.SessionID, consts.RefreshTokenStatusRevoked); err != nil {
-		m.log.Error("撤销重放会话令牌失败", zap.String("session_id", rt.SessionID), zap.Error(err))
-	}
-	if err := m.cache.UpdateSessionStatus(rt.SessionID, consts.SessionStatusRevoked); err != nil {
+	if err := m.revokeSession(context.Background(), rt.UserID, rt.SessionID, consts.SessionStatusRevoked, cache.SessionEventInput{
+		EventType: consts.EventTypeSessionTerminated,
+		Reason:    consts.EventReasonRefreshReplay,
+	}); err != nil {
 		m.log.Error("撤销重放会话失败", zap.Uint64("user_id", rt.UserID), zap.Error(err))
 	}
 
@@ -177,14 +183,11 @@ func (m *SessionService) handleRefreshReplay(rt *cache.RefreshTokenRecord, meta 
 	m.audit(&userID, "", consts.AuditEventRefresh, false, "refresh_token_replay", meta)
 }
 
-// revokeSession 撤销指定会话及其全部 refresh token（尽力而为）
-func (m *SessionService) revokeSession(sessionID string, status int) {
-	if err := m.cache.RevokeSessionTokens(sessionID, consts.RefreshTokenStatusRevoked); err != nil {
-		m.log.Error("撤销会话令牌失败", zap.String("session_id", sessionID), zap.Error(err))
-	}
-	if err := m.cache.UpdateSessionStatus(sessionID, status); err != nil {
-		m.log.Error("撤销会话失败", zap.String("session_id", sessionID), zap.Error(err))
-	}
+// revokeSession 原子撤销指定会话并写事件。旧 session 的请求不会删除新 session 的
+// current_session；这一点不能由按 userId 全量撤销替代。
+func (m *SessionService) revokeSession(ctx context.Context, userID uint64, sessionID string, status int, ev cache.SessionEventInput) error {
+	_, err := m.cache.RevokeSessionWithEvent(ctx, userID, sessionID, status, ev)
+	return err
 }
 
 // RevokeAllUserSessions 撤销用户全部 active 会话与 refresh token，并向事件流广播下线事件。
