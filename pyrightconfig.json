@@ -1,0 +1,7 @@
+{
+  "include": ["agent_server/app", "agent_server/tests"],
+  "typeCheckingMode": "basic",
+  "venvPath": "agent_server",
+  "venv": ".venv",
+  "extraPaths": ["agent_server"]
+}
