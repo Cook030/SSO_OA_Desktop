@@ -2,10 +2,12 @@ package cache
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"mh-sso-svc/internal/consts"
@@ -24,6 +26,23 @@ import (
 //
 // 脚本内需要按 sessionId / tokenHash 动态拼键，故通过 fmt.Sprintf 注入
 // redis.go 中定义的键前缀，保证 Go 侧与 Lua 侧的键名一致。
+
+// Lua 脚本独立保存，以获得语法高亮和更易维护的结构；编译时嵌入二进制。
+//
+//go:embed session_scripts.lua
+var sessionScripts string
+
+var (
+	loginReplaceLua, revokeUserLua, revokeSessionLua = splitSessionScripts(sessionScripts)
+)
+
+func splitSessionScripts(scripts string) (string, string, string) {
+	parts := strings.Split(scripts, "-- __SCRIPT_SEPARATOR__")
+	if len(parts) != 3 {
+		panic("cache: session Lua script count must be 3")
+	}
+	return parts[0], parts[1], parts[2]
+}
 
 // loginReplaceLua 登录时的会话置换脚本。
 //
@@ -61,7 +80,7 @@ import (
 //
 //	{1, newSessionId, replacedCount, replacedSessionId...} 成功
 //	{2, "", 0}                                            reject 模式下已存在有效会话
-const loginReplaceLua = `
+const legacyLoginReplaceLua = `
 local SESSION_PREF = "%s"
 local RT_PREF = "%s"
 local FAMILY_PREF = "%s"
@@ -179,7 +198,7 @@ return out
 //	11 nowMs
 //
 // 返回：{revokedCount, revokedSessionId...}
-const revokeUserLua = `
+const legacyRevokeUserLua = `
 local SESSION_PREF = "%s"
 local RT_PREF = "%s"
 local FAMILY_PREF = "%s"
@@ -252,7 +271,7 @@ return out
 // 重放请求不会误伤后来登录产生的新会话。
 //
 // KEYS: session, token-family, current-session, user-session-index, event-stream
-const revokeSessionLua = `
+const legacyRevokeSessionLua = `
 local SESSION_PREF = "%s"
 local RT_PREF = "%s"
 local FAMILY_PREF = "%s"
