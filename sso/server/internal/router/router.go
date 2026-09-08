@@ -42,6 +42,7 @@ func SetupRouter(db *gorm.DB, rdb *cache.Cache, cfg *utils.Config) *gin.Engine {
 	tokenSvc := service.NewTokenService(&cfg.Auth)
 	authSvc := service.NewAuthService(db, rdb, tokenSvc, &cfg.Auth)
 	authHandler := handler.NewAuthHandler(authSvc, &cfg.Auth)
+	internalHandler := handler.NewInternalHandler(authSvc)
 
 	auth := r.Group("/api/v1/auth")
 	{
@@ -60,8 +61,18 @@ func SetupRouter(db *gorm.DB, rdb *cache.Cache, cfg *utils.Config) *gin.Engine {
 		}
 
 		// 供业务后端调用的服务接口。
+		// 注意：按 dev.md §4，本接口不应作为公开接口对外暴露；
+		// 内部调用方应改用下方 /internal/v1 下带服务间鉴权的接口，此处保留仅为兼容既有调用方。
 		auth.GET("/introspect", authHandler.Introspect)
 		auth.POST("/revoke-user-sessions", authHandler.RevokeUserSessions)
+	}
+
+	// 服务间内部接口：仅供内网服务（当前为 WebSocket Gateway）调用，
+	// 由 ServiceAuthMiddleware 校验共享密钥与来源网段，禁止公网访问。
+	internal := r.Group("/internal/v1")
+	internal.Use(middleware.ServiceAuthMiddleware(&cfg.Internal))
+	{
+		internal.POST("/sessions/introspect", internalHandler.Introspect)
 	}
 
 	return r

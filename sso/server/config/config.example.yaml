@@ -27,6 +27,15 @@ auth:
   cookie_domain: ".maplehaze.cn"           # 生产 Cookie 域；留空则使用当前域名
   cookie_secure: true                      # HTTPS 环境启用 Secure；本地 HTTP 必须 false
   cookie_same_site: "Lax"                  # Lax / Strict / None
+  # 单设备登录策略：replace=新登录踢掉旧会话（默认）；reject=已登录时拒绝新登录
+  login_mode: "replace"
+
+# 服务间内部接口（供 WebSocket Gateway 调用），必须配置密钥后才会放行
+internal:
+  service_token: "${MH_INTERNAL_TOKEN}"    # 与 ws_gateway 的 sso.service_token 保持一致
+  allow_cidrs:                             # 生产建议仅放行网关所在网段
+    - "10.0.0.0/8"
+    - "172.16.0.0/12"
 
 cors:
   allow_origins:

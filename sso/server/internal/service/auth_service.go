@@ -64,8 +64,8 @@ func (s *AuthService) sessionTTL() time.Duration {
 
 // ---------- 登录 ----------
 
-// Login 账号密码登录：校验用户与密码、创建会话、签发双 token、记审计
-func (s *AuthService) Login(account, password string, meta RequestMeta) (*LoginResult, error) {
+// Login 账号密码登录：校验用户与密码、建立会话、签发双 token、记审计
+func (s *AuthService) Login(ctx context.Context, account, password string, meta RequestMeta) (*LoginResult, error) {
 	account = utils.Truncate(account, maxAccountInputLength)
 
 	// 1. 登录失败限流（账号 / IP）
@@ -91,12 +91,30 @@ func (s *AuthService) Login(account, password string, meta RequestMeta) (*LoginR
 
 	now := time.Now()
 
-	// 4. 创建会话与 refresh token（原子：任一写入失败则整体失败，不产生残缺状态）
-	sessionID, refreshToken, err := s.sessionSvc.CreateLoginSession(
-		user, meta.IP, meta.UserAgent, s.sessionTTL(), s.refreshTTL(), now)
+	// 4. 建立会话（单设备登录：一次 Lua 原子完成"撤销旧会话 + 写新会话 + 写下线事件"）
+	established, err := s.sessionSvc.EstablishLoginSession(ctx, EstablishSessionInput{
+		User:       user,
+		DeviceID:   meta.DeviceID,
+		DeviceType: meta.DeviceType,
+		LoginIP:    meta.IP,
+		UserAgent:  meta.UserAgent,
+		SessionTTL: s.sessionTTL(),
+		RefreshTTL: s.refreshTTL(),
+		Now:        now,
+		Mode:       consts.ParseLoginMode(s.cfg.LoginMode),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("登录创建会话失败(uid=%d): %w", user.ID, err)
 	}
+	// reject 模式：已有有效会话，拒绝本次登录，不改动任何会话状态
+	if established.Rejected {
+		s.recordSecurityAudit(&user.ID, user.Account, consts.AuditEventLoginFailed, false, "session_active_elsewhere", meta)
+		return nil, utils.NewBizErrorWithReason(
+			utils.CodeConflict,
+			"该账号已在其他设备登录，请先退出后再登录",
+			consts.ReasonSessionActiveElsewhere)
+	}
+	sessionID, refreshToken := established.SessionID, established.RefreshToken
 
 	// 5. 签发 access token
 	accessToken, _, _, err := s.tokenSvc.GenerateAccessToken(user.ID, sessionID, user.Account, int(user.PasswordVersion), now)
@@ -111,6 +129,8 @@ func (s *AuthService) Login(account, password string, meta RequestMeta) (*LoginR
 	s.log.Info("登录成功",
 		zap.Uint64("user_id", user.ID),
 		zap.String("session_id", sessionID),
+		zap.String("device_id", meta.DeviceID),
+		zap.Strings("replaced_sessions", established.ReplacedSessionIDs),
 		zap.String("ip", meta.IP))
 
 	return &LoginResult{
@@ -285,8 +305,13 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID uint64, passwor
 		return fmt.Errorf("更新密码失败(uid=%d): %w", userID, err)
 	}
 
-	// 撤销该用户全部会话与 refresh token，修改后必须重新登录
-	s.sessionSvc.revokeAllUserSessions(userID, consts.AuditEventChangePassword, meta)
+	// 撤销该用户全部会话与 refresh token，并广播下线事件，修改后必须重新登录
+	if _, err := s.sessionSvc.RevokeAllUserSessions(ctx, userID, cache.SessionEventInput{
+		EventType: consts.EventTypeSessionTerminated,
+		Reason:    consts.EventReasonPasswordChanged,
+	}, consts.AuditEventChangePassword, meta); err != nil {
+		return fmt.Errorf("改密后撤销用户会话失败(uid=%d): %w", userID, err)
+	}
 	return nil
 }
 
@@ -376,11 +401,16 @@ func (s *AuthService) Me(userID uint64) (*MeResult, error) {
 
 // ---------- 撤销用户会话 ----------
 
-// RevokeUserSessions 撤销指定用户全部会话与 refresh token（内部接口）
-func (s *AuthService) RevokeUserSessions(userID uint64, meta RequestMeta) error {
+// RevokeUserSessions 撤销指定用户全部会话与 refresh token，并广播下线事件（内部接口）
+func (s *AuthService) RevokeUserSessions(ctx context.Context, userID uint64, meta RequestMeta) error {
 	if userID <= 0 {
 		return utils.NewBizError(utils.CodeBadRequest, "userId is required")
 	}
-	s.sessionSvc.revokeAllUserSessions(userID, consts.AuditEventRevoke, meta)
+	if _, err := s.sessionSvc.RevokeAllUserSessions(ctx, userID, cache.SessionEventInput{
+		EventType: consts.EventTypeSessionTerminated,
+		Reason:    consts.EventReasonRevokedByAdmin,
+	}, consts.AuditEventRevoke, meta); err != nil {
+		return fmt.Errorf("撤销用户会话失败(uid=%d): %w", userID, err)
+	}
 	return nil
 }

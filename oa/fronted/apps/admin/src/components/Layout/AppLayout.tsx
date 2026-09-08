@@ -15,6 +15,8 @@ import { Outlet, useLocation, useNavigate } from "react-router";
 import { qiankunWindow } from "vite-plugin-qiankun/dist/helper";
 import logo from "../../assets/logo.svg";
 import { useNProgress } from "../../hooks/useNProgress";
+import { useRealtimeSession } from "../../hooks/useRealtimeSession";
+import { stopRealtime } from "../../realtime";
 import { dspRouteManifest } from "../../router/routeManifest";
 import { fetchMenuConfig, loadMenuConfigFromCache } from "../../services/menuConfigService";
 import ssoRequest from "../../utils/ssoRequest";
@@ -74,6 +76,9 @@ const AppLayout: React.FC = () => {
 
   const isInQiankun = qiankunWindow.__POWERED_BY_QIANKUN__;
 
+  // 维持一条实时连接：用于接收"账号已在其他设备登录"等会话下线事件
+  useRealtimeSession();
+
   const [menuItems, setMenuItems] = useState<MenuItem[]>(() => {
     const cachedMenu = loadMenuConfigFromCache("dsp");
     return cachedMenu && cachedMenu.length > 0
@@ -132,6 +137,8 @@ const AppLayout: React.FC = () => {
 
   // ==== 定义退出登录的处理函数 ====
   const handleLogout = async () => {
+    // 主动登出：先断开实时连接，避免登出瞬间收到自己的下线事件而弹窗
+    stopRealtime();
     try {
       // 调用后端的 SSO 登出接口
       // 后端需要负责：清除本地 Session，并请求 SSO 认证中心销毁全局会话

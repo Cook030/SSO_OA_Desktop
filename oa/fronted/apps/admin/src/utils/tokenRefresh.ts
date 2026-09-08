@@ -11,12 +11,23 @@ const REFRESH_ENDPOINT = "/api/v1/auth/refresh";
 
 let refreshPromise: Promise<boolean> | null = null;
 let hasRedirected = false;
+let sessionEnded = false;
 
 /** 跳转到 SSO 登录页（防重入，避免多次跳转） */
 export function redirectToSSOLogin(): void {
   if (hasRedirected) return;
   hasRedirected = true;
   window.location.href = SSO_LOGIN_URL;
+}
+
+/** 标记会话已被顶下线：之后不再尝试刷新 token（刷新必然失败） */
+export function markSessionEnded(): void {
+  sessionEnded = true;
+}
+
+/** 会话是否已被顶下线 */
+export function isSessionEnded(): boolean {
+  return sessionEnded;
 }
 
 /**
@@ -30,6 +41,10 @@ export function redirectToSSOLogin(): void {
  * @returns true = 刷新成功，可重试原请求；false = 刷新失败，需跳转登录页
  */
 export function refreshAccessToken(): Promise<boolean> {
+  // 会话已被顶下线：刷新必然失败，直接放弃，让调用方走跳转登录流程
+  if (sessionEnded) {
+    return Promise.resolve(false);
+  }
   // 并发去重：多个 401 同时到达时只发一次刷新请求
   if (refreshPromise) {
     return refreshPromise;

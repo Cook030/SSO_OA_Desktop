@@ -7,17 +7,25 @@ import (
 	"mh-sso-svc/internal/utils"
 )
 
-// RequestMeta 请求元信息（审计与限流用）
+// RequestMeta 请求元信息（审计、限流与设备绑定用）
 type RequestMeta struct {
 	IP        string
 	UserAgent string
 	RequestID string
+	// DeviceID 客户端设备唯一标识（已规范化）；为空表示未知设备
+	DeviceID string
+	// DeviceType 设备类型：desktop / mobile / tablet / unknown
+	DeviceType string
 }
 
 // LoginRequest 登录请求
 type LoginRequest struct {
 	Account  string `json:"account" binding:"required"`
 	Password string `json:"password" binding:"required"`
+	// DeviceID 可选：客户端设备唯一标识，缺省时从 X-MH-Device-Id 头读取
+	DeviceID string `json:"deviceId"`
+	// DeviceType 可选：desktop / mobile / tablet，缺省时从 X-MH-Device-Type 头读取
+	DeviceType string `json:"deviceType"`
 }
 
 // ChangePasswordRequest 修改密码请求
@@ -95,6 +103,17 @@ type IntrospectResult struct {
 	SessionID       string `json:"sessionId"`
 	PasswordVersion int    `json:"passwordVersion"`
 	Valid           bool   `json:"valid"`
+}
+
+// GatewayIntrospectResult 供 WebSocket Gateway 使用的会话校验结果。
+// Active=false 时携带 Reason，Gateway 据此转换为对应的 WebSocket 关闭码。
+type GatewayIntrospectResult struct {
+	Active    bool      `json:"active"`
+	UserID    uint64    `json:"userId,omitempty"`
+	SessionID string    `json:"sessionId,omitempty"`
+	DeviceID  string    `json:"deviceId,omitempty"`
+	ExpiresAt time.Time `json:"expiresAt,omitempty"`
+	Reason    string    `json:"reason,omitempty"`
 }
 
 // buildUserInfo 组装用户展示信息（字段与接口文档对齐）

@@ -51,30 +51,6 @@ type RefreshTokenRecord struct {
 
 // ---------- 会话 ----------
 
-// SaveSession 写入会话记录并登记用户会话索引，TTL 与会话过期时间对齐
-func (c *Cache) SaveSession(rec *SessionRecord, ttl time.Duration) error {
-	if ttl <= 0 {
-		ttl = time.Until(rec.ExpiredAt)
-	}
-	raw, err := json.Marshal(rec)
-	if err != nil {
-		return err
-	}
-
-	ctx := context.Background()
-	idx := userSessionKey(rec.UserID)
-	pipe := c.rdb.Pipeline()
-	pipe.Set(ctx, sessionKey(rec.SessionID), raw, ttl)
-	pipe.SAdd(ctx, idx, rec.SessionID)
-	pipe.Expire(ctx, idx, ttl)
-	if _, err := pipe.Exec(ctx); err != nil {
-		c.onError("save_session", err)
-		return err
-	}
-	c.onOK()
-	return nil
-}
-
 // GetSession 读取会话记录；不存在返回 ErrRecordNotFound
 func (c *Cache) GetSession(sessionID string) (*SessionRecord, error) {
 	var rec SessionRecord
@@ -123,45 +99,15 @@ func (c *Cache) TouchSession(sessionID string, lastActiveAt, expiredAt time.Time
 	pipe := c.rdb.Pipeline()
 	pipe.Set(ctx, sessionKey(sessionID), raw, ttl)
 	pipe.Expire(ctx, userSessionKey(rec.UserID), ttl)
+	// current_session 必须与会话同寿命：否则会话续期后 current_session 先过期，
+	// 会导致仍然有效的会话被误判为 SESSION_REPLACED
+	pipe.Expire(ctx, currentSessionKey(rec.UserID), ttl)
 	if _, err := pipe.Exec(ctx); err != nil {
 		c.onError("touch_session", err)
 		return err
 	}
 	c.onOK()
 	return nil
-}
-
-// RevokeUserSessions 将用户全部 active 会话置为指定状态，返回被撤销的会话数
-func (c *Cache) RevokeUserSessions(userID uint64, status int) (int, error) {
-	ctx := context.Background()
-	idx := userSessionKey(userID)
-	sessionIDs, err := c.rdb.SMembers(ctx, idx).Result()
-	if err != nil {
-		c.onError("list_user_sessions", err)
-		return 0, err
-	}
-
-	now := time.Now()
-	revoked := 0
-	for _, sessionID := range sessionIDs {
-		rec, err := c.GetSession(sessionID)
-		if errors.Is(err, ErrRecordNotFound) {
-			// 记录已过期，顺带清理索引残留
-			_ = c.rdb.SRem(ctx, idx, sessionID)
-			continue
-		}
-		if err != nil || rec.Status != consts.SessionStatusActive {
-			continue
-		}
-		rec.Status = status
-		rec.UpdatedAt = now
-		if err := c.setSessionKeepTTL(rec); err != nil {
-			continue
-		}
-		revoked++
-	}
-	c.onOK()
-	return revoked, nil
 }
 
 // setSessionKeepTTL 写回会话记录并保留原有剩余 TTL
@@ -253,22 +199,6 @@ func (c *Cache) RevokeSessionTokens(sessionID string, status int) error {
 		_ = c.setRefreshTokenKeepTTL(rec)
 	}
 	c.onOK()
-	return nil
-}
-
-// RevokeUserTokens 撤销用户全部 active 令牌（遍历其全部会话的令牌索引）
-func (c *Cache) RevokeUserTokens(userID uint64, status int) error {
-	ctx := context.Background()
-	sessionIDs, err := c.rdb.SMembers(ctx, userSessionKey(userID)).Result()
-	if err != nil {
-		c.onError("list_user_sessions", err)
-		return err
-	}
-	for _, sessionID := range sessionIDs {
-		if err := c.RevokeSessionTokens(sessionID, status); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 

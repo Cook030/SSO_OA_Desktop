@@ -240,15 +240,29 @@ func (c *Cache) ReleaseRefreshLock(tokenHash, requestID string) {
 
 // ---------- Key 构造 ----------
 
-func sessionKey(sessionID string) string        { return "sso:session:" + sessionID }
-func refreshTokenKey(tokenHash string) string   { return "sso:rt:" + tokenHash }
-func sessionTokenKey(sessionID string) string   { return "sso:rt_family:" + sessionID }
-func introspectKey(tokenHash string) string     { return "sso:introspect:" + tokenHash }
+// Key 前缀：Lua 脚本内需要按 sessionId / tokenHash 动态拼键，
+// 因此前缀在此统一定义，脚本通过 fmt.Sprintf 注入，避免前后缀定义漂移。
+const (
+	sessionKeyPrefix      = "sso:session:"
+	refreshTokenKeyPrefix = "sso:rt:"
+	sessionTokenKeyPrefix = "sso:rt_family:"
+)
+
+func sessionKey(sessionID string) string      { return sessionKeyPrefix + sessionID }
+func refreshTokenKey(tokenHash string) string { return refreshTokenKeyPrefix + tokenHash }
+func sessionTokenKey(sessionID string) string { return sessionTokenKeyPrefix + sessionID }
+func introspectKey(tokenHash string) string   { return "sso:introspect:" + tokenHash }
 func refreshLockKey(tokenHash string) string    { return "sso:refresh_lock:" + tokenHash }
 func loginFailAccountKey(account string) string { return "sso:login_fail:account:" + account }
 func loginFailIPKey(ip string) string           { return "sso:login_fail:ip:" + ip }
 func userSessionKey(userID uint64) string {
 	return "sso:user_sessions:" + strconv.FormatUint(userID, 10)
+}
+
+// currentSessionKey 用户唯一有效会话（dev.md §1：sso:user:{userId}:current_session）。
+// 用户会话集合沿用历史键 sso:user_sessions:{userId}，无需数据迁移。
+func currentSessionKey(userID uint64) string {
+	return "sso:user:" + strconv.FormatUint(userID, 10) + ":current_session"
 }
 func passwordVersionKey(userID uint64) string {
 	return "sso:user:password_version:" + strconv.FormatUint(userID, 10)

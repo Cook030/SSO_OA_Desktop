@@ -1,15 +1,20 @@
+import { deviceHeaders } from "@/utils/device";
+
 /** 统一响应结构（接口文档 §2） */
 export interface ApiResponse<T> {
   code: number;
   msg: string;
   data: T | null;
+  /** 机器原因码（如 SESSION_REPLACED / SESSION_ACTIVE_ELSEWHERE），可空 */
+  reason?: string;
 }
 
-/** 业务错误：携带服务端业务码与提示语 */
+/** 业务错误：携带服务端业务码、提示语与机器原因码 */
 export class ApiError extends Error {
   constructor(
     message: string,
     readonly code: number,
+    readonly reason?: string,
   ) {
     super(message);
     this.name = "ApiError";
@@ -45,6 +50,8 @@ async function rawRequest<T>(path: string, init: RequestInit): Promise<T> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     Accept: "application/json",
+    // 设备唯一标识：登录时写入会话，供 WebSocket 握手与审计使用
+    ...deviceHeaders(),
     ...(init.headers as Record<string, string> | undefined),
   };
   if (memoryAccessToken) {
@@ -62,7 +69,7 @@ async function rawRequest<T>(path: string, init: RequestInit): Promise<T> {
   if (body?.code === 200 && body.data !== undefined) {
     return body.data as T;
   }
-  throw new ApiError(body?.msg ?? `请求失败（${res.status}）`, body?.code ?? res.status);
+  throw new ApiError(body?.msg ?? `请求失败（${res.status}）`, body?.code ?? res.status, body?.reason);
 }
 
 /**

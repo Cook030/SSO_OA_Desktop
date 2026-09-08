@@ -1,5 +1,6 @@
 import type { AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from "axios";
 import axios from "axios";
+import { handleSessionEnded, isSessionReplacedResponse } from "./sessionGuard";
 import { redirectToSSOLogin, refreshAccessToken } from "./tokenRefresh";
 
 // 定义后端统一返回格式
@@ -7,6 +8,8 @@ interface ApiResponse<T = any> {
   code: number;
   message: string;
   data: T;
+  // reason：业务后端透传的 SSO 机器原因码（如 SESSION_REPLACED）
+  reason?: string;
 }
 
 // 创建 axios 实例
@@ -65,6 +68,12 @@ request.interceptors.response.use(
       return data;
     }
 
+    // 会话已被顶下线：刷新必然失败，直接走下线流程（dev.md §2 场景三）
+    if (isSessionReplacedResponse(response.data)) {
+      handleSessionEnded(response.data?.reason);
+      return Promise.reject(new Error("账号已在其他设备登录"));
+    }
+
     // 业务层面的 401：尝试刷新 token 后重试，失败则跳转登录
     if (code === 401) {
       // 已重试过的请求仍返回 401，直接跳转登录
@@ -97,6 +106,12 @@ request.interceptors.response.use(
 
     if (error.response) {
       const { status, data } = error.response;
+
+      // 会话已被顶下线：刷新必然失败，直接走下线流程
+      if (isSessionReplacedResponse(data)) {
+        handleSessionEnded(data?.reason);
+        return Promise.reject(new Error("账号已在其他设备登录"));
+      }
 
       // HTTP 401：尝试刷新 token 后重试，失败则跳转登录
       if (status === 401) {

@@ -51,6 +51,16 @@ type AuthConfig struct {
 	CookieDomain          string `mapstructure:"cookie_domain"`
 	CookieSecure          bool   `mapstructure:"cookie_secure"`
 	CookieSameSite        string `mapstructure:"cookie_same_site"`
+	// LoginMode 重复登录处理策略：replace=踢出旧会话（默认），reject=拒绝新登录
+	LoginMode string `mapstructure:"login_mode"`
+}
+
+// InternalConfig 服务间内部接口配置（供 WebSocket Gateway 调用）
+type InternalConfig struct {
+	// ServiceToken 服务间共享密钥，Gateway 通过 X-MH-Service-Token 携带
+	ServiceToken string `mapstructure:"service_token"`
+	// AllowCIDRs 允许访问内部接口的来源网段；为空表示不限制（生产环境应显式配置）
+	AllowCIDRs []string `mapstructure:"allow_cidrs"`
 }
 
 // CORSConfig 跨域配置
@@ -75,12 +85,13 @@ type LogConfig struct {
 
 // Config 全局配置
 type Config struct {
-	Server ServerConfig `mapstructure:"server"`
-	MySQL  MySQLConfig  `mapstructure:"mysql"`
-	Redis  RedisConfig  `mapstructure:"redis"`
-	Auth   AuthConfig   `mapstructure:"auth"`
-	CORS   CORSConfig   `mapstructure:"cors"`
-	Log    LogConfig    `mapstructure:"log"`
+	Server   ServerConfig   `mapstructure:"server"`
+	MySQL    MySQLConfig    `mapstructure:"mysql"`
+	Redis    RedisConfig    `mapstructure:"redis"`
+	Auth     AuthConfig     `mapstructure:"auth"`
+	Internal InternalConfig `mapstructure:"internal"`
+	CORS     CORSConfig     `mapstructure:"cors"`
+	Log      LogConfig      `mapstructure:"log"`
 }
 
 // LoadConfig 加载配置文件，支持 ${ENV} 形式的环境变量占位符展开
@@ -148,6 +159,7 @@ func (c *Config) applyDefaults() {
 		c.CORS.AllowHeaders = []string{
 			"Origin", "Content-Type", "Accept", "Authorization",
 			RefreshTokenHeaderName, "X-Request-Id",
+			DeviceIDHeader, DeviceTypeHeader,
 		}
 	}
 	if c.CORS.MaxAge == 0 {

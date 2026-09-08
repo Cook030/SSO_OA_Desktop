@@ -77,6 +77,14 @@ export default defineConfig(({ mode }) => {
           //   });
           // }
         },
+        // WebSocket Gateway：单设备登录的会话下线事件推送
+        "/api/v1/realtime": {
+          // target: "wss://realtime.maplehaze.cn", // 线上网关
+          target: "http://127.0.0.1:8090", // 纯本地：ws-gateway
+          changeOrigin: true,
+          ws: true // 关键：允许升级 WebSocket
+        },
+
         // 2. 兜底：处理直接以 /api 开头的请求（防止其他地方直接写绝对路径）
         "/api": {
           // target: "https://oa.maplehaze.cn", // 线上后端

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"time"
 
 	"mh-sso-svc/internal/cache"
@@ -43,41 +44,89 @@ func (m *SessionService) audit(userID *uint64, account, eventType string, succes
 	}
 }
 
-// CreateLoginSession 创建一次性会话与 refresh token 记录，返回会话 ID 与 refresh token 明文。
-// 两步 Redis 写入任一失败即整体失败，保证登录不产生"有会话无令牌"的残缺状态。
-func (m *SessionService) CreateLoginSession(user *model.SysUser, loginIP, userAgent string, sessionTTL, refreshTTL time.Duration, now time.Time) (sessionID, refreshToken string, err error) {
-	sessionID = utils.GenerateOpaqueToken("session_")
-	refreshToken = utils.GenerateOpaqueToken("rt_")
+// EstablishSessionInput 建立登录会话的入参
+type EstablishSessionInput struct {
+	User       *model.SysUser
+	DeviceID   string // 已规范化的设备唯一标识
+	DeviceType string
+	LoginIP    string
+	UserAgent  string
+	SessionTTL time.Duration
+	RefreshTTL time.Duration
+	Now        time.Time
+	// Mode 重复登录策略：replace 踢出旧会话，reject 拒绝本次登录
+	Mode consts.LoginMode
+}
+
+// EstablishSessionResult 建立登录会话的结果
+type EstablishSessionResult struct {
+	SessionID          string
+	RefreshToken       string
+	ReplacedSessionIDs []string // 本次被顶下线的旧会话
+	Rejected           bool     // reject 模式下已存在有效会话，本次登录被拒绝
+}
+
+// EstablishLoginSession 单设备登录的会话建立入口。
+//
+// 与旧版 CreateLoginSession 的区别：不再"先建新会话再撤销旧会话"，
+// 而是把"撤销旧会话 + 撤销旧 refresh token + 写入新会话 + 写入新 token +
+// 重置用户会话索引 + 写 current_session + 为每个旧会话写下线事件"
+// 收敛为一次 Redis Lua 调用（cache.ReplaceLoginSession）。
+//
+// 这样旧客户端即使收不到任何 WebSocket 消息，其 access token 也会在同一次
+// 原子操作后立刻失效；也不会出现"状态变了但事件没写"的半成功状态。
+func (m *SessionService) EstablishLoginSession(ctx context.Context, in EstablishSessionInput) (*EstablishSessionResult, error) {
+	sessionID := utils.GenerateOpaqueToken("session_")
+	refreshToken := utils.GenerateOpaqueToken("rt_")
 
 	session := &cache.SessionRecord{
 		SessionID:       sessionID,
-		UserID:          user.ID,
-		LoginIP:         utils.EmptyToNil(loginIP),
-		LoginUserAgent:  utils.EmptyToNil(userAgent),
+		UserID:          in.User.ID,
+		DeviceID:        utils.EmptyToNil(in.DeviceID),
+		DeviceType:      utils.EmptyToNil(in.DeviceType),
+		LoginIP:         utils.EmptyToNil(in.LoginIP),
+		LoginUserAgent:  utils.EmptyToNil(in.UserAgent),
 		Status:          consts.SessionStatusActive,
-		PasswordVersion: int(user.PasswordVersion),
-		LastActiveAt:    now,
-		ExpiredAt:       now.Add(sessionTTL),
-		CreatedAt:       now,
-		UpdatedAt:       now,
+		PasswordVersion: int(in.User.PasswordVersion),
+		LastActiveAt:    in.Now,
+		ExpiredAt:       in.Now.Add(in.SessionTTL),
+		CreatedAt:       in.Now,
+		UpdatedAt:       in.Now,
 	}
-	if err = m.cache.SaveSession(session, sessionTTL); err != nil {
-		return "", "", err
-	}
-
 	rt := &cache.RefreshTokenRecord{
 		TokenHash: utils.SHA256Hex(refreshToken),
 		SessionID: sessionID,
-		UserID:    user.ID,
+		UserID:    in.User.ID,
 		Status:    consts.RefreshTokenStatusActive,
-		ExpiredAt: now.Add(refreshTTL),
-		CreatedAt: now,
-		UpdatedAt: now,
+		ExpiredAt: in.Now.Add(in.RefreshTTL),
+		CreatedAt: in.Now,
+		UpdatedAt: in.Now,
 	}
-	if err = m.cache.SaveRefreshToken(rt, refreshTTL); err != nil {
-		return "", "", err
+
+	res, err := m.cache.ReplaceLoginSession(ctx, cache.LoginReplaceInput{
+		UserID:       in.User.ID,
+		Mode:         in.Mode,
+		Session:      session,
+		SessionTTL:   in.SessionTTL,
+		RefreshToken: rt,
+		RefreshTTL:   in.RefreshTTL,
+		Event: cache.SessionEventInput{
+			EventType: consts.EventTypeSessionReplaced,
+			Reason:    consts.EventReasonReplacedByNewLogin,
+		},
+	})
+	if err != nil {
+		return nil, err
 	}
-	return sessionID, refreshToken, nil
+	if res.Rejected {
+		return &EstablishSessionResult{Rejected: true}, nil
+	}
+
+	return &EstablishSessionResult{
+		SessionID:          res.SessionID,
+		RefreshToken:       refreshToken,
+		ReplacedSessionIDs: res.ReplacedSessionIDs,
+	}, nil
 }
 
 // RotateRefreshToken 轮换 refresh token 并滑动续期会话。
@@ -138,21 +187,25 @@ func (m *SessionService) revokeSession(sessionID string, status int) {
 	}
 }
 
-// revokeAllUserSessions 撤销用户全部 active 会话与 refresh token，清理密码版本缓存，并记录审计
-func (m *SessionService) revokeAllUserSessions(userID uint64, event string, meta RequestMeta) {
-	revoked := 0
-	if n, err := m.cache.RevokeUserSessions(userID, consts.SessionStatusRevoked); err != nil {
+// RevokeAllUserSessions 撤销用户全部 active 会话与 refresh token，并向事件流广播下线事件。
+//
+// 与登录置换一样，状态变更与事件写入在同一次 Lua 中完成：
+// Gateway 消费事件后即可通知在线客户端；离线客户端则因 current_session 被清空
+// 而在下一次请求时拿到 401。
+func (m *SessionService) RevokeAllUserSessions(ctx context.Context, userID uint64, ev cache.SessionEventInput, auditEvent string, meta RequestMeta) ([]string, error) {
+	revoked, err := m.cache.RevokeUserSessionsWithEvents(ctx, userID, consts.SessionStatusRevoked, ev)
+	if err != nil {
 		m.log.Error("撤销用户会话失败", zap.Uint64("user_id", userID), zap.Error(err))
-	} else {
-		revoked = n
-	}
-	if err := m.cache.RevokeUserTokens(userID, consts.RefreshTokenStatusRevoked); err != nil {
-		m.log.Error("撤销用户 refresh token 失败", zap.Uint64("user_id", userID), zap.Error(err))
+		return nil, err
 	}
 
 	// 清理密码版本缓存，强制下次回源
 	m.cache.DeletePasswordVersion(userID)
 
-	m.audit(&userID, "", event, true, "", meta)
-	m.log.Info("已撤销用户全部会话", zap.Uint64("user_id", userID), zap.Int("session_count", revoked))
+	m.audit(&userID, "", auditEvent, true, "", meta)
+	m.log.Info("已撤销用户全部会话并广播下线事件",
+		zap.Uint64("user_id", userID),
+		zap.String("reason", ev.Reason),
+		zap.Int("session_count", len(revoked)))
+	return revoked, nil
 }

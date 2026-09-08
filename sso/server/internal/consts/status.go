@@ -10,6 +10,7 @@ const (
 	AuditEventRevoke         = "revoke"
 	AuditEventChangePassword = "change_password"
 	AuditEventUpdateProfile  = "update_profile"
+	AuditEventSessionReplaced = "session_replaced"
 )
 
 // 会话状态（SessionRecord.Status）
@@ -19,6 +20,7 @@ const (
 	SessionStatusLoggedOut = 2 // 已登出
 	SessionStatusRevoked   = 3 // 已撤销
 	SessionStatusExpired   = 4 // 已过期
+	SessionStatusReplaced  = 5 // 被新登录置换（单设备登录）
 )
 
 // refresh token 状态（RefreshTokenRecord.Status）

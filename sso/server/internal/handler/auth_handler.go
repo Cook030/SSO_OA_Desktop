@@ -25,13 +25,26 @@ func NewAuthHandler(svc *service.AuthService, cfg *utils.AuthConfig) *AuthHandle
 }
 
 // Login 登录（成功写入 HttpOnly Cookie）
+//
+// 单设备登录：会话建立由 AuthService.Login 内部的 Redis Lua 原子完成，
+// 旧会话在同一操作中被置为 replaced 并写入下线事件。
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req service.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.BadRequest(c, fmt.Sprintf("参数解析失败: %v", err))
 		return
 	}
-	result, err := h.svc.Login(req.Account, req.Password, requestMeta(c))
+
+	meta := requestMeta(c)
+	// 请求体优先于 Header：非浏览器客户端（App / CLI）无法依赖自定义 Header 时可用 body 传递
+	if req.DeviceID != "" {
+		meta.DeviceID = utils.NormalizeDeviceID(req.DeviceID)
+	}
+	if req.DeviceType != "" {
+		meta.DeviceType = utils.NormalizeDeviceType(req.DeviceType)
+	}
+
+	result, err := h.svc.Login(c.Request.Context(), req.Account, req.Password, meta)
 	if err != nil {
 		h.writeErr(c, err)
 		return
@@ -113,7 +126,7 @@ func (h *AuthHandler) RevokeUserSessions(c *gin.Context) {
 		utils.BadRequest(c, fmt.Sprintf("参数解析失败: %v", err))
 		return
 	}
-	if err := h.svc.RevokeUserSessions(req.UserID, requestMeta(c)); err != nil {
+	if err := h.svc.RevokeUserSessions(c.Request.Context(), req.UserID, requestMeta(c)); err != nil {
 		h.writeErr(c, err)
 		return
 	}
@@ -122,12 +135,14 @@ func (h *AuthHandler) RevokeUserSessions(c *gin.Context) {
 
 // ---------- 私有辅助 ----------
 
-// requestMeta 提取请求元信息（审计与限流用），超长字段按列宽截断
+// requestMeta 提取请求元信息（审计、限流与设备绑定用），超长字段按列宽截断
 func requestMeta(c *gin.Context) service.RequestMeta {
 	return service.RequestMeta{
-		IP:        utils.Truncate(c.ClientIP(), 64),
-		UserAgent: utils.Truncate(c.Request.UserAgent(), 512),
-		RequestID: middleware.GetRequestID(c),
+		IP:         utils.Truncate(c.ClientIP(), 64),
+		UserAgent:  utils.Truncate(c.Request.UserAgent(), 512),
+		RequestID:  middleware.GetRequestID(c),
+		DeviceID:   utils.NormalizeDeviceID(c.GetHeader(utils.DeviceIDHeader)),
+		DeviceType: utils.NormalizeDeviceType(c.GetHeader(utils.DeviceTypeHeader)),
 	}
 }
 
@@ -196,7 +211,7 @@ func (h *AuthHandler) writeResult(c *gin.Context, data interface{}, err error) {
 func (h *AuthHandler) writeErr(c *gin.Context, err error) {
 	var biz *utils.BizError
 	if errors.As(err, &biz) {
-		utils.Error(c, biz.Code, biz.Msg)
+		utils.ErrorWithReason(c, biz.Code, biz.Msg, biz.Reason)
 		return
 	}
 	utils.GetLogger().Error("接口处理失败",

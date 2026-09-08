@@ -1,0 +1,57 @@
+server:
+  port: 8090
+  mode: debug
+  # 消费组内的消费者名，留空则使用主机名；多实例部署时必须保证唯一
+  instance_id: ""
+  shutdown_timeout_second: 10
+
+redis:
+  addr: 127.0.0.1:6379
+  password: ""
+  db: 0
+  pool_size: 50
+
+sso:
+  # Gateway → SSO 的内部鉴权接口（dev.md §4）
+  introspect_url: "http://127.0.0.1:8081/internal/v1/sessions/introspect"
+  # 必须与 SSO 的 internal.service_token 一致
+  service_token: "dev-only-internal-token-change-me"
+  timeout_second: 3
+
+realtime:
+  ws_path: "/api/v1/realtime/ws"
+  # 留空时只放行同源请求；生产环境请显式列出允许的 Origin
+  allowed_origins:
+    - "http://localhost:5173"
+    - "http://localhost:8004"
+  access_token_cookie_name: "mh_sso_access_token"
+
+  # dev.md §2：服务端每 25 秒 Ping，45 秒未收到 Pong 则关闭连接
+  ping_interval_second: 25
+  pong_wait_second: 45
+  # 写队列上限：满时普通消息丢弃，关键事件则关闭连接
+  write_queue_size: 128
+  read_limit_bytes: 4096
+  max_connections: 10000
+
+  consumer_group: "ws-gateway"
+  consumer_block_ms: 2000
+  consumer_batch_size: 64
+  # 悬挂消息超过该时长可被其他实例接管（XAUTOCLAIM）
+  pending_claim_idle_second: 30
+  pending_claim_interval_second: 10
+
+  # 未确认事件的保留时长
+  delivery_ttl_second: 86400
+  # 连接在线状态 key 的 TTL（心跳续期）
+  connection_ttl_second: 60
+  # 会话终结事件投递后，强制关闭连接的宽限期（留出 ACK 时间）
+  terminate_grace_second: 3
+
+log:
+  path: logs/ws-gateway.log
+  level: "debug"
+  max_size: 100
+  max_backups: 10
+  max_age: 30
+  compress: false

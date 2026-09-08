@@ -1,0 +1,49 @@
+server:
+  port: 8090
+  mode: release
+  # 消费组内消费者名必须唯一；多实例部署请配置 instance_id（可用 env: ${HOSTNAME}）
+  instance_id: ""
+  shutdown_timeout_second: 10
+
+redis:
+  addr: 127.0.0.1:6379
+  password: "${REDIS_PASSWORD}"
+  db: 0
+  pool_size: 50
+
+sso:
+  # Gateway → SSO 的内部鉴权接口（生产指向 SSO 内网地址）
+  introspect_url: "http://sso.internal:8081/internal/v1/sessions/introspect"
+  # 必须与 SSO 的 internal.service_token 一致，经环境变量注入
+  service_token: "${MH_INTERNAL_TOKEN}"
+  timeout_second: 3
+
+realtime:
+  ws_path: "/api/v1/realtime/ws"
+  allowed_origins:
+    - "https://oa.maplehaze.cn"
+  access_token_cookie_name: "mh_sso_access_token"
+
+  ping_interval_second: 25        # 服务端 Ping 间隔
+  pong_wait_second: 45            # 收不到 Pong 的容忍时间
+  write_queue_size: 128
+  read_limit_bytes: 4096
+  max_connections: 10000
+
+  consumer_group: "ws-gateway"
+  consumer_block_ms: 2000
+  consumer_batch_size: 64
+  pending_claim_idle_second: 30
+  pending_claim_interval_second: 10
+
+  delivery_ttl_second: 86400      # 未确认事件的保留时长
+  connection_ttl_second: 60       # 在线状态 key 的 TTL（心跳续期）
+  terminate_grace_second: 3       # 会话终结事件后强制关闭的宽限期
+
+log:
+  path: logs/ws-gateway.log
+  level: "info"
+  max_size: 100
+  max_backups: 10
+  max_age: 30
+  compress: false
