@@ -7,6 +7,7 @@ package cache
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"strconv"
 	"sync/atomic"
@@ -17,6 +18,16 @@ import (
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 )
+
+// 本包所有 Redis Lua 脚本均独立保存在 scripts/ 目录，经 go:embed 编译进二进制；
+// 每个脚本文件的头部注释描述其 KEYS / ARGV 契约。
+
+// releaseRefreshLockLua 校验持有者后删除 refresh 并发锁。
+//
+//go:embed scripts/release_refresh_lock.lua
+var releaseRefreshLockLua string
+
+var releaseRefreshLockScript = redis.NewScript(releaseRefreshLockLua)
 
 // IntrospectCacheData sso:introspect:{accessTokenHash} 缓存内容
 type IntrospectCacheData struct {
@@ -230,8 +241,7 @@ func (c *Cache) AcquireRefreshLock(tokenHash, requestID string) bool {
 
 // ReleaseRefreshLock 释放并发锁（仅删除自己持有的锁，避免误删其他请求的锁）
 func (c *Cache) ReleaseRefreshLock(tokenHash, requestID string) {
-	const delIfOwner = `if redis.call("GET", KEYS[1]) == ARGV[1] then return redis.call("DEL", KEYS[1]) else return 0 end`
-	if err := c.rdb.Eval(context.Background(), delIfOwner, []string{refreshLockKey(tokenHash)}, requestID).Err(); err != nil {
+	if err := releaseRefreshLockScript.Run(context.Background(), c.rdb, []string{refreshLockKey(tokenHash)}, requestID).Err(); err != nil {
 		c.onError("release_refresh_lock", err)
 		return
 	}

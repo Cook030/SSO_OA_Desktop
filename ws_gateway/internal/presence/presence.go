@@ -7,6 +7,7 @@ package presence
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"time"
 
@@ -14,6 +15,16 @@ import (
 
 	"github.com/redis/go-redis/v9"
 )
+
+// Redis Lua 脚本独立保存在 scripts/ 目录，经 go:embed 编译进二进制；
+// 每个脚本文件的头部注释描述其 KEYS / ARGV 契约。
+
+// releaseConnectionLua 校验持有者后删除连接在线状态。
+//
+//go:embed scripts/release_connection.lua
+var releaseConnectionLua string
+
+var releaseConnectionScript = redis.NewScript(releaseConnectionLua)
 
 // Record 连接在线状态
 type Record struct {
@@ -56,14 +67,5 @@ func (s *Store) Heartbeat(ctx context.Context, rec Record) error {
 
 // Release 释放连接：仅当 key 仍属于本连接时才删除，避免误删新建立的连接
 func (s *Store) Release(ctx context.Context, sessionID, connectionID string) error {
-	const script = `
-local raw = redis.call("GET", KEYS[1])
-if not raw then return 0 end
-local ok, rec = pcall(cjson.decode, raw)
-if ok and type(rec) == "table" and rec["connectionId"] == ARGV[1] then
-  return redis.call("DEL", KEYS[1])
-end
-return 0
-`
-	return s.rdb.Eval(ctx, script, []string{s.key(sessionID)}, connectionID).Err()
+	return releaseConnectionScript.Run(ctx, s.rdb, []string{s.key(sessionID)}, connectionID).Err()
 }
